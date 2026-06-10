@@ -9,6 +9,10 @@ const port = process.env.PORT || 3000;
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use((req, res, next) => {
+    console.log(`[REQUEST] ${new Date().toISOString()} - ${req.method} ${req.url}`, req.body);
+    next();
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Database Config
