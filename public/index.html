@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerenciador de Tarefas e Fechamento Mensal</title>
+    <!-- Google Fonts: Outfit & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <i class="fa-solid fa-list-check logo-icon"></i>
+                <h2>TaskFlow <span>Gerência</span></h2>
+            </div>
+            <nav class="sidebar-menu">
+                <a href="#" class="menu-item active" data-tab="dashboard-tab" id="nav-dashboard">
+                    <i class="fa-solid fa-chart-line"></i> Painel Geral
+                </a>
+                <a href="#" class="menu-item" data-tab="projects-tab" id="nav-projects">
+                    <i class="fa-solid fa-folder-open"></i> Projetos
+                </a>
+                <a href="#" class="menu-item" data-tab="tasks-tab" id="nav-tasks">
+                    <i class="fa-solid fa-bars-progress"></i> Quadro de Tarefas
+                </a>
+                <a href="#" class="menu-item" data-tab="team-tab" id="nav-team">
+                    <i class="fa-solid fa-users"></i> Equipes & Setores
+                </a>
+                <a href="#" class="menu-item" data-tab="closing-tab" id="nav-closing">
+                    <i class="fa-solid fa-file-invoice-dollar"></i> Fechamento Mensal
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <p><i class="fa-solid fa-database"></i> SQL Server Ativo</p>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="main-header">
+                <div class="header-title">
+                    <h1 id="page-title">Painel Geral</h1>
+                    <p id="page-subtitle">Visão unificada das coordenadorias e projetos</p>
+                </div>
+                <div class="header-profile">
+                    <div class="profile-info">
+                        <span class="profile-name">Gestor de TI</span>
+                        <span class="profile-role">Gerência Geral</span>
+                    </div>
+                    <div class="profile-avatar">
+                        <i class="fa-solid fa-user-tie"></i>
+                    </div>
+                </div>
+            </header>
+
+            <!-- TAB CONTENT CONTAINER -->
+            <div class="tab-container">
+                
+                <!-- 1. DASHBOARD TAB -->
+                <section id="dashboard-tab" class="tab-content active">
+                    <!-- KPI Cards Grid -->
+                    <div class="kpi-grid">
+                        <div class="kpi-card glass">
+                            <div class="kpi-icon icon-blue"><i class="fa-solid fa-folder-tree"></i></div>
+                            <div class="kpi-data">
+                                <span class="kpi-title">Projetos Ativos</span>
+                                <h3 class="kpi-value" id="kpi-active-projects">0</h3>
+                            </div>
+                        </div>
+                        <div class="kpi-card glass">
+                            <div class="kpi-icon icon-amber"><i class="fa-solid fa-circle-nodes"></i></div>
+                            <div class="kpi-data">
+                                <span class="kpi-title">Tarefas Pendentes</span>
+                                <h3 class="kpi-value" id="kpi-pending-tasks">0</h3>
+                            </div>
+                        </div>
+                        <div class="kpi-card glass">
+                            <div class="kpi-icon icon-green"><i class="fa-solid fa-user-group"></i></div>
+                            <div class="kpi-data">
+                                <span class="kpi-title">Colaboradores</span>
+                                <h3 class="kpi-value" id="kpi-total-collaborators">0</h3>
+                            </div>
+                        </div>
+                        <div class="kpi-card glass">
+                            <div class="kpi-icon icon-violet"><i class="fa-solid fa-clock"></i></div>
+                            <div class="kpi-data">
+                                <span class="kpi-title">Horas Trabalhadas</span>
+                                <h3 class="kpi-value" id="kpi-total-hours">0h</h3>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts / Subsections -->
+                    <div class="dashboard-panels">
+                        <div class="panel glass large">
+                            <div class="panel-header">
+                                <h3>Projetos Recentes</h3>
+                                <button class="btn btn-primary btn-sm" id="btn-dashboard-add-project">
+                                    <i class="fa-solid fa-plus"></i> Novo Projeto
+                                </button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="custom-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Projeto</th>
+                                            <th>Coordenadoria</th>
+                                            <th>Prazo</th>
+                                            <th>Progresso</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="dashboard-projects-list">
+                                        <!-- Dynamic content -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2. PROJECTS TAB -->
+                <section id="projects-tab" class="tab-content">
+                    <div class="section-actions">
+                        <div class="search-box glass">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="project-search" placeholder="Buscar projetos...">
+                        </div>
+                        <button class="btn btn-primary" id="btn-add-project">
+                            <i class="fa-solid fa-folder-plus"></i> Registrar Novo Projeto
+                        </button>
+                    </div>
+
+                    <div class="projects-grid" id="projects-list-container">
+                        <!-- Dynamic cards -->
+                    </div>
+                </section>
+
+                <!-- 3. TASKS TAB -->
+                <section id="tasks-tab" class="tab-content">
+                    <div class="section-actions">
+                        <div class="filter-group glass">
+                            <label for="task-project-filter"><i class="fa-solid fa-filter"></i> Filtrar por Projeto:</label>
+                            <select id="task-project-filter">
+                                <option value="all">Todos os Projetos</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" id="btn-add-task">
+                            <i class="fa-solid fa-circle-plus"></i> Criar Nova Tarefa
+                        </button>
+                    </div>
+
+                    <!-- Kanban Board -->
+                    <div class="kanban-board">
+                        <!-- Column: To Do -->
+                        <div class="kanban-column glass" data-status="A Fazer">
+                            <div class="column-header">
+                                <span class="badge badge-todo">A Fazer</span>
+                                <span class="column-count" id="count-todo">0</span>
+                            </div>
+                            <div class="kanban-cards" id="tasks-todo-container">
+                                <!-- Cards -->
+                            </div>
+                        </div>
+
+                        <!-- Column: In Progress -->
+                        <div class="kanban-column glass" data-status="Em Progresso">
+                            <div class="column-header">
+                                <span class="badge badge-progress">Em Progresso</span>
+                                <span class="column-count" id="count-progress">0</span>
+                            </div>
+                            <div class="kanban-cards" id="tasks-progress-container">
+                                <!-- Cards -->
+                            </div>
+                        </div>
+
+                        <!-- Column: Completed -->
+                        <div class="kanban-column glass" data-status="Concluída">
+                            <div class="column-header">
+                                <span class="badge badge-done">Concluídas</span>
+                                <span class="column-count" id="count-done">0</span>
+                            </div>
+                            <div class="kanban-cards" id="tasks-done-container">
+                                <!-- Cards -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 4. TEAM / COORD TAB -->
+                <section id="team-tab" class="tab-content">
+                    <div class="split-layout">
+                        <!-- Left Panel: Collaborators -->
+                        <div class="panel glass">
+                            <div class="panel-header">
+                                <h3>Colaboradores</h3>
+                                <button class="btn btn-secondary btn-sm" id="btn-add-collaborator">
+                                    <i class="fa-solid fa-user-plus"></i> Adicionar Colaborador
+                                </button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="custom-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Nome</th>
+                                            <th>Cargo</th>
+                                            <th>Email</th>
+                                            <th>Coordenadoria</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="collaborators-list">
+                                        <!-- Dynamic content -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Coordinations -->
+                        <div class="panel glass narrow">
+                            <div class="panel-header">
+                                <h3>Coordenadorias</h3>
+                                <button class="btn btn-secondary btn-sm" id="btn-add-coordination">
+                                    <i class="fa-solid fa-plus"></i> Nova Sigla
+                                </button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="custom-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Sigla</th>
+                                            <th>Nome</th>
+                                            <th>Gerência</th>
+                                            <th style="width: 140px; text-align: right;">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="coordinations-list">
+                                        <!-- Dynamic content -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Gerências -->
+                        <div class="panel glass narrow">
+                            <div class="panel-header">
+                                <h3>Gerências</h3>
+                                <button class="btn btn-secondary btn-sm" id="btn-add-management">
+                                    <i class="fa-solid fa-plus"></i> Nova Gerência
+                                </button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="custom-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Sigla</th>
+                                            <th>Nome</th>
+                                            <th style="width: 110px; text-align: right;">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="managements-list">
+                                        <!-- Dynamic content -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 5. CLOSING TAB (FECHAMENTO) -->
+                <section id="closing-tab" class="tab-content">
+                    <!-- Date Selector and Report Info -->
+                    <div class="report-filters glass">
+                        <div class="filter-inputs">
+                            <div class="filter-input-group">
+                                <label for="report-month"><i class="fa-solid fa-calendar-days"></i> Mês:</label>
+                                <select id="report-month">
+                                    <option value="1">Janeiro</option>
+                                    <option value="2">Fevereiro</option>
+                                    <option value="3">Março</option>
+                                    <option value="4">Abril</option>
+                                    <option value="5">Maio</option>
+                                    <option value="6">Junho</option>
+                                    <option value="7">Julho</option>
+                                    <option value="8">Agosto</option>
+                                    <option value="9">Setembro</option>
+                                    <option value="10">Outubro</option>
+                                    <option value="11">Novembro</option>
+                                    <option value="12">Dezembro</option>
+                                </select>
+                            </div>
+                            <div class="filter-input-group">
+                                <label for="report-year">Ano:</label>
+                                <select id="report-year">
+                                    <option value="2026" selected>2026</option>
+                                    <option value="2027">2027</option>
+                                    <option value="2028">2028</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-primary" id="btn-generate-report">
+                                <i class="fa-solid fa-calculator"></i> Gerar Relatório de Fechamento
+                            </button>
+                        </div>
+                        <button class="btn btn-secondary" id="btn-print-report">
+                            <i class="fa-solid fa-print"></i> Imprimir/Salvar PDF
+                        </button>
+                    </div>
+
+                    <!-- Closing Report Output (Print Area) -->
+                    <div id="print-area">
+                        <!-- Project Report Section -->
+                        <div class="panel glass report-section">
+                            <div class="panel-header report-section-header">
+                                <div class="report-header-detail">
+                                    <h3>Fechamento por Projetos</h3>
+                                    <p class="report-subtitle">Projetos com entregas agendadas para o período selecionado</p>
+                                </div>
+                                <span class="report-period-badge" id="project-report-period">Junho / 2026</span>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="custom-table report-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Projeto</th>
+                                            <th>Coordenadoria</th>
+                                            <th>Total de Tarefas</th>
+                                            <th>Tarefas Concluídas</th>
+                                            <th>Total Estimado (h)</th>
+                                            <th>Total Realizado (h)</th>
+                                            <th>Colaboradores Alocados</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="report-projects-body">
+                                        <!-- Dynamic content -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Collaborator Report Section -->
+                        <div class="panel glass report-section">
+                            <div class="panel-header report-section-header">
+                                <div class="report-header-detail">
+                                    <h3>Fechamento por Colaborador</h3>
+                                    <p class="report-subtitle">Apontamento de horas e tarefas entregues por membro da equipe</p>
+                                </div>
+                                <span class="report-period-badge" id="collaborator-report-period">Junho / 2026</span>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="custom-table report-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Colaborador</th>
+                                            <th>Coordenadoria</th>
+                                            <th>Projetos Envolvidos</th>
+                                            <th>Tarefas Associadas</th>
+                                            <th>Tarefas Entregues</th>
+                                            <th>Total Horas Apontadas (h)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="report-collaborators-body">
+                                        <!-- Dynamic content -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- --- MODAL DIALOGS --- -->
+
+    <!-- 1. PROJECT MODAL -->
+    <div class="modal-backdrop" id="modal-project">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h3 id="project-modal-title">Novo Projeto</h3>
+                <button class="modal-close" id="btn-close-project-modal">&times;</button>
+            </div>
+            <form id="form-project">
+                <input type="hidden" id="project-id">
+                <div class="form-group">
+                    <label for="project-name">Nome do Projeto *</label>
+                    <input type="text" id="project-name" required placeholder="Ex: Novo Portal de Atendimento">
+                </div>
+                <div class="form-group">
+                    <label for="project-desc">Descrição</label>
+                    <textarea id="project-desc" rows="3" placeholder="Insira o escopo e objetivos do projeto..."></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="project-start">Data de Início *</label>
+                        <input type="date" id="project-start" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="project-end">Previsão de Fim</label>
+                        <input type="date" id="project-end">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="project-coordination">Coordenadoria Responsável *</label>
+                        <select id="project-coordination" required>
+                            <!-- Dynamic options -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="project-status">Status *</label>
+                        <select id="project-status" required>
+                            <option value="Planejado">Planejado</option>
+                            <option value="Em Andamento" selected>Em Andamento</option>
+                            <option value="Pendente">Pendente</option>
+                            <option value="Concluído">Concluído</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-project">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Projeto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 2. TASK MODAL -->
+    <div class="modal-backdrop" id="modal-task">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h3>Criar Nova Tarefa</h3>
+                <button class="modal-close" id="btn-close-task-modal">&times;</button>
+            </div>
+            <form id="form-task">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="task-project">Projeto Associado *</label>
+                        <select id="task-project" required>
+                            <!-- Dynamic options -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-priority">Prioridade *</label>
+                        <select id="task-priority" required>
+                            <option value="Baixa">Baixa</option>
+                            <option value="Média" selected>Média</option>
+                            <option value="Alta">Alta</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="task-title">Título da Tarefa *</label>
+                    <input type="text" id="task-title" required placeholder="Ex: Desenvolver protótipo de telas">
+                </div>
+                <div class="form-group">
+                    <label for="task-desc">Descrição detalhada</label>
+                    <textarea id="task-desc" rows="2" placeholder="Descreva os requisitos ou etapas para esta tarefa..."></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="task-assignee">Responsável Principal *</label>
+                        <select id="task-assignee" required>
+                            <!-- Dynamic options -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-deadline">Data Limite de Entrega *</label>
+                        <input type="date" id="task-deadline" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="task-est-hours">Horas Estimadas *</label>
+                        <input type="number" id="task-est-hours" required min="0" step="0.5" value="8">
+                    </div>
+                    <div class="form-group">
+                        <label for="task-worked-hours">Horas Realizadas</label>
+                        <input type="number" id="task-worked-hours" min="0" step="0.5" value="0">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-task">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Criar Tarefa</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 3. COLLABORATOR MODAL -->
+    <div class="modal-backdrop" id="modal-collaborator">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h3>Adicionar Novo Colaborador</h3>
+                <button class="modal-close" id="btn-close-colab-modal">&times;</button>
+            </div>
+            <form id="form-collaborator">
+                <div class="form-group">
+                    <label for="colab-name">Nome Completo *</label>
+                    <input type="text" id="colab-name" required placeholder="Ex: Carlos Eduardo Santos">
+                </div>
+                <div class="form-group">
+                    <label for="colab-email">E-mail Corporativo *</label>
+                    <input type="email" id="colab-email" required placeholder="Ex: carlos.santos@empresa.com">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="colab-role">Cargo *</label>
+                        <input type="text" id="colab-role" required placeholder="Ex: Administrador de Banco de Dados">
+                    </div>
+                    <div class="form-group">
+                        <label for="colab-coordination">Coordenadoria *</label>
+                        <select id="colab-coordination" required>
+                            <!-- Dynamic options -->
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-colab">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Registrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 4. COORDINATION MODAL -->
+    <div class="modal-backdrop" id="modal-coordination">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h3 id="coord-modal-title">Registrar Coordenadoria</h3>
+                <button class="modal-close" id="btn-close-coord-modal">&times;</button>
+            </div>
+            <form id="form-coordination">
+                <input type="hidden" id="coord-id">
+                <div class="form-group">
+                    <label for="coord-sigla">Sigla *</label>
+                    <input type="text" id="coord-sigla" required placeholder="Ex: COSIS" maxlength="10">
+                </div>
+                <div class="form-group">
+                    <label for="coord-name">Nome da Coordenadoria *</label>
+                    <input type="text" id="coord-name" required placeholder="Ex: Coordenadoria de Sistemas de Informação">
+                </div>
+                <div class="form-group">
+                    <label for="coord-gerencia">Gerência Vinculada *</label>
+                    <select id="coord-gerencia" required>
+                        <!-- Dynamic options -->
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-coord">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 4.5 MANAGEMENT MODAL -->
+    <div class="modal-backdrop" id="modal-management">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h3 id="mgmt-modal-title">Registrar Gerência</h3>
+                <button class="modal-close" id="btn-close-mgmt-modal">&times;</button>
+            </div>
+            <form id="form-management">
+                <input type="hidden" id="mgmt-id">
+                <div class="form-group">
+                    <label for="mgmt-sigla">Sigla *</label>
+                    <input type="text" id="mgmt-sigla" required placeholder="Ex: GETEC" maxlength="10">
+                </div>
+                <div class="form-group">
+                    <label for="mgmt-name">Nome da Gerência *</label>
+                    <input type="text" id="mgmt-name" required placeholder="Ex: Gerência de Tecnologia da Informação">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-mgmt">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 5. TASK LOG HOURS / STATUS MODAL -->
+    <div class="modal-backdrop" id="modal-edit-task-status">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h3>Atualizar Progresso da Tarefa</h3>
+                <button class="modal-close" id="btn-close-edit-task-modal">&times;</button>
+            </div>
+            <form id="form-edit-task-status">
+                <input type="hidden" id="edit-task-id">
+                <div class="form-group">
+                    <h4 id="edit-task-title-display" style="font-family: 'Outfit'; font-weight: 600; margin-bottom: 15px;"></h4>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="edit-task-status-select">Status Atual</label>
+                        <select id="edit-task-status-select" required>
+                            <option value="A Fazer">A Fazer</option>
+                            <option value="Em Progresso">Em Progresso</option>
+                            <option value="Concluída">Concluída</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-task-worked-hours">Horas Realizadas (Acumuladas)</label>
+                        <input type="number" id="edit-task-worked-hours" required min="0" step="0.5">
+                    </div>
+                </div>
+
+                <!-- Subtasks List section in task view -->
+                <div class="subtasks-section">
+                    <label style="font-weight: 500; margin-bottom: 10px; display: block;"><i class="fa-solid fa-list-ul"></i> Sub-tarefas:</label>
+                    <ul class="subtask-list" id="edit-task-subtasks-list">
+                        <!-- Checkboxes of subtasks -->
+                    </ul>
+                    <div class="add-subtask-form">
+                        <input type="text" id="new-subtask-title" placeholder="Nova sub-tarefa...">
+                        <button type="button" class="btn btn-secondary btn-sm" id="btn-add-subtask-action"><i class="fa-solid fa-plus"></i></button>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-edit-task">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Script Entrypoint -->
+    <script src="app.js" type="module"></script>
+</body>
+</html>

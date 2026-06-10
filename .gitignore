@@ -1,0 +1,5 @@
+node_modules/
+.env
+SSMS-Setup-ENU.exe
+SQL2022-SSEI-Dev.exe
+ssms_install*.log
