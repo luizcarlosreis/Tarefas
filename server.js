@@ -200,9 +200,9 @@ app.post('/api/colaboradores', async (req, res) => {
     const { nome, email, cargo, coordenadoria_id } = req.body;
     try {
         const result = await pool.request()
-            .input('nome', sql.VarChar, nome)
-            .input('email', sql.VarChar, email)
-            .input('cargo', sql.VarChar, cargo)
+            .input('nome', sql.NVarChar, nome)
+            .input('email', sql.NVarChar, email)
+            .input('cargo', sql.NVarChar, cargo)
             .input('coordenadoria_id', sql.Int, coordenadoria_id || null)
             .query(`
                 INSERT INTO Colaboradores (nome, email, cargo, coordenadoria_id) 
@@ -210,6 +210,40 @@ app.post('/api/colaboradores', async (req, res) => {
                 VALUES (@nome, @email, @cargo, @coordenadoria_id)
             `);
         res.status(201).json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/colaboradores/:id', async (req, res) => {
+    const { id } = req.params;
+    const { nome, email, cargo, coordenadoria_id } = req.body;
+    try {
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .input('nome', sql.NVarChar, nome)
+            .input('email', sql.NVarChar, email)
+            .input('cargo', sql.NVarChar, cargo)
+            .input('coordenadoria_id', sql.Int, coordenadoria_id || null)
+            .query(`
+                UPDATE Colaboradores
+                SET nome = @nome, email = @email, cargo = @cargo, coordenadoria_id = @coordenadoria_id
+                OUTPUT INSERTED.*
+                WHERE id = @id
+            `);
+        res.json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/colaboradores/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.request()
+            .input('id', sql.Int, id)
+            .query('DELETE FROM Colaboradores WHERE id = @id');
+        res.json({ success: true, message: 'Collaborator deleted successfully.' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -313,10 +347,10 @@ app.post('/api/tarefas', async (req, res) => {
     try {
         const result = await pool.request()
             .input('projeto_id', sql.Int, projeto_id)
-            .input('titulo', sql.VarChar, titulo)
-            .input('descricao', sql.VarChar, descricao || null)
-            .input('status', sql.VarChar, status || 'A Fazer')
-            .input('prioridade', sql.VarChar, prioridade || 'Média')
+            .input('titulo', sql.NVarChar, titulo)
+            .input('descricao', sql.NVarChar, descricao || null)
+            .input('status', sql.NVarChar, status || 'A Fazer')
+            .input('prioridade', sql.NVarChar, prioridade || 'Média')
             .input('data_entrega', sql.Date, data_entrega || null)
             .input('horas_estimadas', sql.Decimal(5, 2), horas_estimadas || 0)
             .input('horas_trabalhadas', sql.Decimal(5, 2), horas_trabalhadas || 0)
@@ -334,16 +368,25 @@ app.post('/api/tarefas', async (req, res) => {
 
 app.put('/api/tarefas/:id', async (req, res) => {
     const { id } = req.params;
-    const { status, horas_trabalhadas, colaborador_id } = req.body;
+    const { projeto_id, titulo, descricao, status, prioridade, data_entrega, horas_estimadas, horas_trabalhadas, colaborador_id } = req.body;
     try {
         const result = await pool.request()
             .input('id', sql.Int, id)
-            .input('status', sql.VarChar, status)
+            .input('projeto_id', sql.Int, projeto_id)
+            .input('titulo', sql.NVarChar, titulo)
+            .input('descricao', sql.NVarChar, descricao || null)
+            .input('status', sql.NVarChar, status)
             .input('horas_trabalhadas', sql.Decimal(5, 2), horas_trabalhadas || 0)
             .input('colaborador_id', sql.Int, colaborador_id || null)
+            .input('prioridade', sql.NVarChar, prioridade)
+            .input('data_entrega', sql.Date, data_entrega || null)
+            .input('horas_estimadas', sql.Decimal(5, 2), horas_estimadas || 0)
             .query(`
                 UPDATE Tarefas
-                SET status = @status, horas_trabalhadas = @horas_trabalhadas, colaborador_id = @colaborador_id
+                SET projeto_id = @projeto_id, titulo = @titulo, descricao = @descricao, 
+                    status = @status, prioridade = @prioridade, data_entrega = @data_entrega, 
+                    horas_estimadas = @horas_estimadas, horas_trabalhadas = @horas_trabalhadas, 
+                    colaborador_id = @colaborador_id
                 OUTPUT INSERTED.*
                 WHERE id = @id
             `);
@@ -383,7 +426,7 @@ app.post('/api/subtarefas', async (req, res) => {
     try {
         const result = await pool.request()
             .input('tarefa_id', sql.Int, tarefa_id)
-            .input('titulo', sql.VarChar, titulo)
+            .input('titulo', sql.NVarChar, titulo)
             .input('concluida', sql.Bit, concluida ? 1 : 0)
             .input('colaborador_id', sql.Int, colaborador_id || null)
             .query(`
@@ -411,6 +454,39 @@ app.put('/api/subtarefas/:id', async (req, res) => {
                 WHERE id = @id
             `);
         res.json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/subtarefas/detalhes/:id', async (req, res) => {
+    const { id } = req.params;
+    const { titulo, concluida, colaborador_id } = req.body;
+    try {
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .input('titulo', sql.NVarChar, titulo)
+            .input('concluida', sql.Bit, concluida ? 1 : 0)
+            .input('colaborador_id', sql.Int, colaborador_id || null)
+            .query(`
+                UPDATE SubTarefas
+                SET titulo = @titulo, concluida = @concluida, colaborador_id = @colaborador_id
+                OUTPUT INSERTED.*
+                WHERE id = @id
+            `);
+        res.json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/subtarefas/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.request()
+            .input('id', sql.Int, id)
+            .query('DELETE FROM SubTarefas WHERE id = @id');
+        res.json({ success: true, message: 'Subtask deleted successfully.' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

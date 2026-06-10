@@ -109,8 +109,16 @@ function setupEventListeners() {
     // Modal Triggers (Open)
     document.getElementById('btn-add-project').addEventListener('click', () => openModal(elements.modalProject));
     document.getElementById('btn-dashboard-add-project').addEventListener('click', () => openModal(elements.modalProject));
-    document.getElementById('btn-add-task').addEventListener('click', () => openModal(elements.modalTask));
-    document.getElementById('btn-add-collaborator').addEventListener('click', () => openModal(elements.modalCollaborator));
+    document.getElementById('btn-add-task').addEventListener('click', () => {
+        document.getElementById('task-modal-title').textContent = "Criar Nova Tarefa";
+        document.getElementById('task-id').value = '';
+        openModal(elements.modalTask);
+    });
+    document.getElementById('btn-add-collaborator').addEventListener('click', () => {
+        document.getElementById('colab-modal-title').textContent = "Adicionar Novo Colaborador";
+        document.getElementById('colab-id').value = '';
+        openModal(elements.modalCollaborator);
+    });
     document.getElementById('btn-add-coordination').addEventListener('click', () => {
         document.getElementById('coord-modal-title').textContent = "Registrar Coordenadoria";
         document.getElementById('coord-id').value = '';
@@ -140,6 +148,8 @@ function setupEventListeners() {
 
     document.getElementById('btn-close-edit-task-modal').addEventListener('click', () => closeModal(elements.modalEditTaskStatus));
     document.getElementById('btn-cancel-edit-task').addEventListener('click', () => closeModal(elements.modalEditTaskStatus));
+    document.getElementById('btn-delete-task-action').addEventListener('click', handleDeleteTaskAction);
+    document.getElementById('btn-edit-task-details-action').addEventListener('click', handleEditTaskDetailsAction);
 
     // Form Submits
     elements.formProject.addEventListener('submit', handleProjectSubmit);
@@ -266,6 +276,16 @@ function populateDropdowns() {
             gerenciaOptionsHtml += `<option value="${g.id}">${g.sigla} - ${g.nome}</option>`;
         });
         coordGerenciaSelect.innerHTML = gerenciaOptionsHtml;
+    }
+
+    // Subtask collaborator select option
+    const newSubtaskAssigneeSelect = document.getElementById('new-subtask-assignee');
+    if (newSubtaskAssigneeSelect) {
+        let subtaskColabHtml = '<option value="">Sem Colaborador</option>';
+        state.colaboradores.forEach(c => {
+            subtaskColabHtml += `<option value="${c.id}">${c.nome}</option>`;
+        });
+        newSubtaskAssigneeSelect.innerHTML = subtaskColabHtml;
     }
 }
 
@@ -460,7 +480,7 @@ function renderTeamTab() {
     // Render Collaborators
     let colabHtml = '';
     if (state.colaboradores.length === 0) {
-        colabHtml = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Nenhum colaborador registrado.</td></tr>';
+        colabHtml = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Nenhum colaborador registrado.</td></tr>';
     } else {
         state.colaboradores.forEach(c => {
             colabHtml += `
@@ -469,6 +489,14 @@ function renderTeamTab() {
                     <td>${c.cargo}</td>
                     <td>${c.email}</td>
                     <td><span class="project-coord-badge">${c.coordenadoria_sigla || 'Sem Coord.'}</span></td>
+                    <td style="text-align: right;">
+                        <button class="btn btn-secondary btn-sm" onclick="editCollaborator(${c.id})" style="padding: 4px 8px; margin-right: 4px;">
+                            <i class="fa-solid fa-pen" style="font-size: 11px;"></i>
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteCollaborator(${c.id})" style="padding: 4px 8px;">
+                            <i class="fa-solid fa-trash" style="font-size: 11px;"></i>
+                        </button>
+                    </td>
                 </tr>
             `;
         });
@@ -631,6 +659,7 @@ async function handleProjectSubmit(e) {
 
 async function handleTaskSubmit(e) {
     e.preventDefault();
+    const id = document.getElementById('task-id').value;
     const payload = {
         projeto_id: document.getElementById('task-project').value,
         titulo: document.getElementById('task-title').value,
@@ -643,22 +672,33 @@ async function handleTaskSubmit(e) {
     };
 
     try {
-        await fetch('/api/tarefas', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        if (id) {
+            // Edit mode
+            await fetch(`/api/tarefas/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        } else {
+            // Create mode
+            await fetch('/api/tarefas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        }
 
         closeModal(elements.modalTask);
         await loadBaseData();
         renderCurrentTab();
     } catch (err) {
-        console.error('Error creating task:', err);
+        console.error('Error submitting task:', err);
     }
 }
 
 async function handleCollaboratorSubmit(e) {
     e.preventDefault();
+    const id = document.getElementById('colab-id').value;
     const payload = {
         nome: document.getElementById('colab-name').value,
         email: document.getElementById('colab-email').value,
@@ -667,17 +707,28 @@ async function handleCollaboratorSubmit(e) {
     };
 
     try {
-        await fetch('/api/colaboradores', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+        let res;
+        if (id) {
+            // Edit mode
+            res = await fetch(`/api/colaboradores/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(r => r.json());
+        } else {
+            // Create mode
+            res = await fetch('/api/colaboradores', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(r => r.json());
+        }
 
         closeModal(elements.modalCollaborator);
         await loadBaseData();
         renderCurrentTab();
     } catch (err) {
-        console.error('Error creating collaborator:', err);
+        console.error('Error submitting collaborator:', err);
     }
 }
 
@@ -760,6 +811,12 @@ window.openEditTaskModal = async function(taskId) {
     document.getElementById('edit-task-status-select').value = task.status;
     document.getElementById('edit-task-worked-hours').value = task.horas_trabalhadas;
 
+    // Set default assignee for new subtasks to the task's assignee
+    const subtaskAssigneeSelect = document.getElementById('new-subtask-assignee');
+    if (subtaskAssigneeSelect) {
+        subtaskAssigneeSelect.value = task.colaborador_id || '';
+    }
+
     // Load subtasks list
     await loadAndRenderSubtasks(task.id);
     
@@ -779,10 +836,25 @@ async function loadAndRenderSubtasks(taskId) {
             subtasks.forEach(s => {
                 const item = document.createElement('li');
                 item.className = `subtask-item ${s.concluida ? 'completed' : ''}`;
+                
+                // Build options for collaborators list
+                let optionsHtml = '<option value="">Sem Colaborador</option>';
+                state.colaboradores.forEach(c => {
+                    optionsHtml += `<option value="${c.id}" ${c.id === s.colaborador_id ? 'selected' : ''}>${c.nome}</option>`;
+                });
+
                 item.innerHTML = `
                     <input type="checkbox" ${s.concluida ? 'checked' : ''} onchange="toggleSubtask(${s.id}, this.checked)">
                     <span>${s.titulo}</span>
-                    <span style="font-size: 11px; color: var(--text-muted); margin-left: auto;">(${s.colaborador_nome || 'Sem Setor'})</span>
+                    <select onchange="updateSubtaskCollaborator(${s.id}, this.value)" class="subtask-colab-select">
+                        ${optionsHtml}
+                    </select>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="editSubtask(${s.id})" style="padding: 2px 6px; font-size: 10px; background: transparent; border: none; margin-left: 8px;">
+                        <i class="fa-solid fa-pen" style="font-size: 10px; color: var(--text-secondary);"></i>
+                    </button>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="deleteSubtask(${s.id})" style="padding: 2px 6px; font-size: 10px; background: transparent; border: none; margin-left: 2px;">
+                        <i class="fa-solid fa-trash-can" style="font-size: 10px; color: var(--accent-red);"></i>
+                    </button>
                 `;
                 listEl.appendChild(item);
             });
@@ -814,6 +886,30 @@ window.toggleSubtask = async function(subtaskId, isChecked) {
     }
 };
 
+// Update subtask collaborator from inline selector
+window.updateSubtaskCollaborator = async function(subtaskId, collaboratorId) {
+    try {
+        const taskId = parseInt(document.getElementById('edit-task-id').value);
+        const subtasks = await fetch(`/api/subtarefas/${taskId}`).then(r => r.json());
+        const sub = subtasks.find(s => s.id === subtaskId);
+        if (!sub) return;
+
+        await fetch(`/api/subtarefas/detalhes/${subtaskId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                titulo: sub.titulo,
+                concluida: sub.concluida,
+                colaborador_id: collaboratorId ? parseInt(collaboratorId) : null
+            })
+        });
+        
+        await loadAndRenderSubtasks(taskId);
+    } catch (err) {
+        console.error('Error updating subtask collaborator:', err);
+    }
+};
+
 // Add subtask inline button action
 document.getElementById('btn-add-subtask-action').addEventListener('click', async () => {
     const taskId = parseInt(document.getElementById('edit-task-id').value);
@@ -821,9 +917,8 @@ document.getElementById('btn-add-subtask-action').addEventListener('click', asyn
     const title = titleInput.value.trim();
     if (!title) return;
 
-    // Use current task's assignee as default subtask collaborator
-    const task = state.tarefas.find(t => t.id === taskId);
-    const collaborator_id = task ? task.colaborador_id : null;
+    const assigneeSelect = document.getElementById('new-subtask-assignee');
+    const collaborator_id = assigneeSelect && assigneeSelect.value ? parseInt(assigneeSelect.value) : null;
 
     try {
         await fetch('/api/subtarefas', {
@@ -1009,4 +1104,139 @@ window.deleteManagement = async function(mgmtId) {
         }
     }
 };
+
+// Edit collaborator helper
+window.editCollaborator = function(colabId) {
+    const colab = state.colaboradores.find(c => c.id === colabId);
+    if (!colab) return;
+
+    document.getElementById('colab-modal-title').textContent = "Editar Colaborador";
+    document.getElementById('colab-id').value = colab.id;
+    document.getElementById('colab-name').value = colab.nome;
+    document.getElementById('colab-email').value = colab.email;
+    document.getElementById('colab-role').value = colab.cargo;
+    document.getElementById('colab-coordination').value = colab.coordenadoria_id || '';
+
+    openModal(elements.modalCollaborator);
+};
+
+// Delete collaborator helper
+window.deleteCollaborator = async function(colabId) {
+    const colab = state.colaboradores.find(c => c.id === colabId);
+    if (!colab) return;
+
+    if (confirm(`Deseja realmente excluir o colaborador "${colab.nome}"?\nNota: Ele será desvinculado de todas as tarefas e sub-tarefas associadas.`)) {
+        try {
+            const res = await fetch(`/api/colaboradores/${colabId}`, {
+                method: 'DELETE'
+            }).then(r => r.json());
+
+            if (res.error) {
+                alert('Erro ao excluir colaborador: ' + res.error);
+            } else {
+                await loadBaseData();
+                renderCurrentTab();
+            }
+        } catch (err) {
+            console.error('Error deleting collaborator:', err);
+            alert('Erro de conexão ao tentar excluir o colaborador.');
+        }
+    }
+};
+
+// Task Details Edit/Delete Helper functions
+async function handleDeleteTaskAction() {
+    const taskId = document.getElementById('edit-task-id').value;
+    if (!taskId) return;
+
+    if (confirm('Deseja realmente excluir esta tarefa? Todas as sub-tarefas associadas também serão excluídas permanentemente.')) {
+        try {
+            await fetch(`/api/tarefas/${taskId}`, {
+                method: 'DELETE'
+            });
+            closeModal(elements.modalEditTaskStatus);
+            await loadBaseData();
+            renderCurrentTab();
+        } catch (err) {
+            console.error('Error deleting task:', err);
+            alert('Erro ao tentar excluir a tarefa.');
+        }
+    }
+}
+
+function handleEditTaskDetailsAction() {
+    const taskId = parseInt(document.getElementById('edit-task-id').value);
+    if (!taskId) return;
+
+    const task = state.tarefas.find(t => t.id === taskId);
+    if (!task) return;
+
+    // Load fields into form-task
+    document.getElementById('task-modal-title').textContent = "Editar Tarefa";
+    document.getElementById('task-id').value = task.id;
+    document.getElementById('task-project').value = task.projeto_id;
+    document.getElementById('task-priority').value = task.prioridade;
+    document.getElementById('task-title').value = task.titulo;
+    document.getElementById('task-desc').value = task.descricao || '';
+    document.getElementById('task-assignee').value = task.colaborador_id || '';
+    
+    // Format delivery date (YYYY-MM-DD)
+    if (task.data_entrega) {
+        const dateStr = new Date(task.data_entrega).toISOString().split('T')[0];
+        document.getElementById('task-deadline').value = dateStr;
+    } else {
+        document.getElementById('task-deadline').value = '';
+    }
+    
+    document.getElementById('task-est-hours').value = task.horas_estimadas;
+    document.getElementById('task-worked-hours').value = task.horas_trabalhadas;
+
+    // Close status modal and open full edit modal
+    closeModal(elements.modalEditTaskStatus);
+    openModal(elements.modalTask);
+}
+
+// Subtask Edit/Delete Helper functions
+window.editSubtask = async function(subtaskId) {
+    const subtasks = await fetch(`/api/subtarefas/${document.getElementById('edit-task-id').value}`).then(r => r.json());
+    const sub = subtasks.find(s => s.id === subtaskId);
+    if (!sub) return;
+
+    const newTitle = prompt("Digite o novo título para a sub-tarefa:", sub.titulo);
+    if (newTitle === null) return; // user cancelled
+    const titleVal = newTitle.trim();
+    if (!titleVal) return;
+
+    try {
+        await fetch(`/api/subtarefas/detalhes/${subtaskId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                titulo: titleVal,
+                concluida: sub.concluida,
+                colaborador_id: sub.colaborador_id
+            })
+        });
+        
+        const taskId = parseInt(document.getElementById('edit-task-id').value);
+        await loadAndRenderSubtasks(taskId);
+    } catch (err) {
+        console.error('Error editing subtask:', err);
+    }
+};
+
+window.deleteSubtask = async function(subtaskId) {
+    if (confirm("Deseja realmente excluir esta sub-tarefa?")) {
+        try {
+            await fetch(`/api/subtarefas/${subtaskId}`, {
+                method: 'DELETE'
+            });
+            const taskId = parseInt(document.getElementById('edit-task-id').value);
+            await loadAndRenderSubtasks(taskId);
+        } catch (err) {
+            console.error('Error deleting subtask:', err);
+        }
+    }
+};
+
 

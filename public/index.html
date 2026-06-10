@@ -214,6 +214,7 @@
                                             <th>Cargo</th>
                                             <th>Email</th>
                                             <th>Coordenadoria</th>
+                                            <th style="width: 110px; text-align: right;">Ações</th>
                                         </tr>
                                     </thead>
                                     <tbody id="collaborators-list">
@@ -436,10 +437,11 @@
     <div class="modal-backdrop" id="modal-task">
         <div class="modal-content glass">
             <div class="modal-header">
-                <h3>Criar Nova Tarefa</h3>
+                <h3 id="task-modal-title">Criar Nova Tarefa</h3>
                 <button class="modal-close" id="btn-close-task-modal">&times;</button>
             </div>
             <form id="form-task">
+                <input type="hidden" id="task-id">
                 <div class="form-row">
                     <div class="form-group">
                         <label for="task-project">Projeto Associado *</label>
@@ -488,7 +490,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="btn-cancel-task">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Criar Tarefa</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
                 </div>
             </form>
         </div>
@@ -498,10 +500,11 @@
     <div class="modal-backdrop" id="modal-collaborator">
         <div class="modal-content glass">
             <div class="modal-header">
-                <h3>Adicionar Novo Colaborador</h3>
+                <h3 id="colab-modal-title">Adicionar Novo Colaborador</h3>
                 <button class="modal-close" id="btn-close-colab-modal">&times;</button>
             </div>
             <form id="form-collaborator">
+                <input type="hidden" id="colab-id">
                 <div class="form-group">
                     <label for="colab-name">Nome Completo *</label>
                     <input type="text" id="colab-name" required placeholder="Ex: Carlos Eduardo Santos">
@@ -524,7 +527,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="btn-cancel-colab">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Registrar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
                 </div>
             </form>
         </div>
@@ -621,11 +624,20 @@
                     </ul>
                     <div class="add-subtask-form">
                         <input type="text" id="new-subtask-title" placeholder="Nova sub-tarefa...">
+                        <select id="new-subtask-assignee" class="new-subtask-colab-select">
+                            <option value="">Sem Colaborador</option>
+                        </select>
                         <button type="button" class="btn btn-secondary btn-sm" id="btn-add-subtask-action"><i class="fa-solid fa-plus"></i></button>
                     </div>
                 </div>
 
                 <div class="modal-footer">
+                    <button type="button" class="btn btn-danger" id="btn-delete-task-action" style="margin-right: auto;">
+                        <i class="fa-solid fa-trash"></i> Excluir
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="btn-edit-task-details-action">
+                        <i class="fa-solid fa-pen"></i> Editar Detalhes
+                    </button>
                     <button type="button" class="btn btn-secondary" id="btn-cancel-edit-task">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Salvar Alterações</button>
                 </div>
