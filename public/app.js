@@ -932,7 +932,7 @@ document.getElementById('btn-add-subtask-action').addEventListener('click', asyn
         if (!title) return;
 
         const assigneeSelect = document.getElementById('new-subtask-assignee');
-        const collaborator_id = assigneeSelect && assigneeSelect.value ? parseInt(assigneeSelect.value) : null;
+        const colaborador_id = assigneeSelect && assigneeSelect.value ? parseInt(assigneeSelect.value) : null;
 
         const response = await fetch('/api/subtarefas', {
             method: 'POST',
