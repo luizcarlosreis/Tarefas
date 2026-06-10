@@ -918,16 +918,23 @@ window.updateSubtaskCollaborator = async function(subtaskId, collaboratorId) {
 
 // Add subtask inline button action
 document.getElementById('btn-add-subtask-action').addEventListener('click', async () => {
-    const taskId = parseInt(document.getElementById('edit-task-id').value);
-    const titleInput = document.getElementById('new-subtask-title');
-    const title = titleInput.value.trim();
-    if (!title) return;
-
-    const assigneeSelect = document.getElementById('new-subtask-assignee');
-    const collaborator_id = assigneeSelect && assigneeSelect.value ? parseInt(assigneeSelect.value) : null;
-
     try {
-        await fetch('/api/subtarefas', {
+        const taskIdEl = document.getElementById('edit-task-id');
+        if (!taskIdEl) throw new Error("Elemento 'edit-task-id' não encontrado.");
+        
+        const taskId = parseInt(taskIdEl.value);
+        if (isNaN(taskId)) throw new Error("ID da tarefa inválido (NaN).");
+
+        const titleInput = document.getElementById('new-subtask-title');
+        if (!titleInput) throw new Error("Elemento 'new-subtask-title' não encontrado.");
+        
+        const title = titleInput.value.trim();
+        if (!title) return;
+
+        const assigneeSelect = document.getElementById('new-subtask-assignee');
+        const collaborator_id = assigneeSelect && assigneeSelect.value ? parseInt(assigneeSelect.value) : null;
+
+        const response = await fetch('/api/subtarefas', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -938,10 +945,16 @@ document.getElementById('btn-add-subtask-action').addEventListener('click', asyn
             })
         });
 
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error || `Erro HTTP: ${response.status}`);
+        }
+
         titleInput.value = '';
         await loadAndRenderSubtasks(taskId);
     } catch (err) {
         console.error('Error adding subtask:', err);
+        alert('Erro ao adicionar sub-tarefa: ' + err.message);
     }
 });
 
