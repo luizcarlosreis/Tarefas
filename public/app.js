@@ -811,6 +811,12 @@ window.openEditTaskModal = async function(taskId) {
     document.getElementById('edit-task-status-select').value = task.status;
     document.getElementById('edit-task-worked-hours').value = task.horas_trabalhadas;
 
+    // Clear new subtask title input
+    const subtaskTitleInput = document.getElementById('new-subtask-title');
+    if (subtaskTitleInput) {
+        subtaskTitleInput.value = '';
+    }
+
     // Set default assignee for new subtasks to the task's assignee
     const subtaskAssigneeSelect = document.getElementById('new-subtask-assignee');
     if (subtaskAssigneeSelect) {
@@ -936,6 +942,14 @@ document.getElementById('btn-add-subtask-action').addEventListener('click', asyn
         await loadAndRenderSubtasks(taskId);
     } catch (err) {
         console.error('Error adding subtask:', err);
+    }
+});
+
+// Prevent form submission on enter inside subtask input and trigger add instead
+document.getElementById('new-subtask-title').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('btn-add-subtask-action').click();
     }
 });
 
