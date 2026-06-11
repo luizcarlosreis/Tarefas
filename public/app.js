@@ -5,13 +5,15 @@ let state = {
     projetos: [],
     tarefas: [],
     gerencias: [],
+    apontamentos: [],
+    mesesFechamento: [],
     currentTab: 'dashboard-tab'
 };
 
 // --- DOM ELEMENTS ---
 const elements = {
     tabs: document.querySelectorAll('.tab-content'),
-    menuItems: document.querySelectorAll('.menu-item'),
+    menuItems: document.querySelectorAll('.menu-item[data-tab]'),
     pageTitle: document.getElementById('page-title'),
     pageSubtitle: document.getElementById('page-subtitle'),
     
@@ -30,12 +32,13 @@ const elements = {
     collaboratorsList: document.getElementById('collaborators-list'),
     coordinationsList: document.getElementById('coordinations-list'),
     managementsList: document.getElementById('managements-list'),
+    apontamentosList: document.getElementById('apontamentos-list'),
     
     // Filters & Search
     projectSearch: document.getElementById('project-search'),
     taskProjectFilter: document.getElementById('task-project-filter'),
-    reportMonth: document.getElementById('report-month'),
-    reportYear: document.getElementById('report-year'),
+    reportFechamento: document.getElementById('report-fechamento'),
+    apontamentoSearch: document.getElementById('apontamento-search'),
     
     // Modals
     modalProject: document.getElementById('modal-project'),
@@ -44,6 +47,8 @@ const elements = {
     modalCoordination: document.getElementById('modal-coordination'),
     modalManagement: document.getElementById('modal-management'),
     modalEditTaskStatus: document.getElementById('modal-edit-task-status'),
+    modalApontamento: document.getElementById('modal-apontamento'),
+    modalManageFechamentos: document.getElementById('modal-manage-fechamentos'),
     
     // Forms
     formProject: document.getElementById('form-project'),
@@ -51,7 +56,12 @@ const elements = {
     formCollaborator: document.getElementById('form-collaborator'),
     formCoordination: document.getElementById('form-coordination'),
     formManagement: document.getElementById('form-management'),
-    formEditTaskStatus: document.getElementById('form-edit-task-status')
+    formEditTaskStatus: document.getElementById('form-edit-task-status'),
+    formApontamento: document.getElementById('form-apontamento'),
+    formFechamento: document.getElementById('form-fechamento'),
+    
+    // Custom list tables
+    fechamentosListTable: document.getElementById('fechamentos-list-table')
 };
 
 // --- INITIALIZATION ---
@@ -61,24 +71,27 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function initApp() {
-    // Set default month/year for reports to current date
-    const today = new Date();
-    elements.reportMonth.value = today.getMonth() + 1; // 1-indexed
-    elements.reportYear.value = today.getFullYear();
-
     // Fetch initial backend data
     await loadBaseData();
+    
+    // Select the first period by default if available
+    if (state.mesesFechamento && state.mesesFechamento.length > 0) {
+        elements.reportFechamento.value = state.mesesFechamento[0].id;
+    }
+    
     renderCurrentTab();
 }
 
 async function loadBaseData() {
     try {
-        const [resCoord, resColab, resProj, resTasks, resGerencias] = await Promise.all([
+        const [resCoord, resColab, resProj, resTasks, resGerencias, resApont, resFechamentos] = await Promise.all([
             fetch('/api/coordenadorias').then(r => r.json()),
             fetch('/api/colaboradores').then(r => r.json()),
             fetch('/api/projetos').then(r => r.json()),
             fetch('/api/tarefas').then(r => r.json()),
-            fetch('/api/gerencias').then(r => r.json())
+            fetch('/api/gerencias').then(r => r.json()),
+            fetch('/api/apontamentos').then(r => r.json()),
+            fetch('/api/meses-fechamento').then(r => r.json())
         ]);
 
         state.coordenadorias = resCoord;
@@ -86,6 +99,8 @@ async function loadBaseData() {
         state.projetos = resProj;
         state.tarefas = resTasks;
         state.gerencias = resGerencias;
+        state.apontamentos = resApont;
+        state.mesesFechamento = resFechamentos;
 
         // Update filters and dropdowns
         populateDropdowns();
@@ -158,14 +173,103 @@ function setupEventListeners() {
     elements.formCoordination.addEventListener('submit', handleCoordinationSubmit);
     elements.formManagement.addEventListener('submit', handleManagementSubmit);
     elements.formEditTaskStatus.addEventListener('submit', handleEditTaskStatusSubmit);
+    elements.formApontamento.addEventListener('submit', handleApontamentoSubmit);
 
     // Filters and Search
     elements.projectSearch.addEventListener('input', renderProjectsTab);
     elements.taskProjectFilter.addEventListener('change', renderTasksTab);
+    elements.apontamentoSearch.addEventListener('input', renderApontamentosTab);
+    if (elements.reportFechamento) {
+        elements.reportFechamento.addEventListener('change', generateMonthlyReport);
+    }
     
     // Reports trigger
     document.getElementById('btn-generate-report').addEventListener('click', generateMonthlyReport);
     document.getElementById('btn-print-report').addEventListener('click', () => window.print());
+    
+    // Closing periods management triggers
+    document.getElementById('btn-manage-fechamentos').addEventListener('click', openManageFechamentosModal);
+    document.getElementById('nav-manage-periods').addEventListener('click', (e) => {
+        e.preventDefault();
+        openManageFechamentosModal();
+    });
+    document.getElementById('btn-close-manage-fechamentos-modal').addEventListener('click', () => closeModal(elements.modalManageFechamentos));
+    document.getElementById('btn-close-manage-fechamentos').addEventListener('click', () => closeModal(elements.modalManageFechamentos));
+    elements.formFechamento.addEventListener('submit', handleFechamentoSubmit);
+
+    // Apontamento Modal triggers
+    document.getElementById('btn-add-apontamento').addEventListener('click', () => {
+        document.getElementById('apontamento-date').value = new Date().toISOString().split('T')[0];
+        document.getElementById('apontamento-id').value = '';
+        document.getElementById('apontamento-collaborator').value = '';
+        document.getElementById('apontamento-project').value = '';
+        document.getElementById('apontamento-hours').value = '';
+        document.getElementById('apontamento-desc').value = '';
+        
+        const taskSelect = document.getElementById('apontamento-task');
+        taskSelect.innerHTML = '<option value="" disabled selected>Selecione um projeto primeiro...</option>';
+        taskSelect.disabled = true;
+        
+        const subtaskSelect = document.getElementById('apontamento-subtask');
+        subtaskSelect.innerHTML = '<option value="">Nenhuma (Opcional)</option>';
+        subtaskSelect.disabled = true;
+        
+        openModal(elements.modalApontamento);
+    });
+
+    document.getElementById('btn-close-apontamento-modal').addEventListener('click', () => closeModal(elements.modalApontamento));
+    document.getElementById('btn-cancel-apontamento').addEventListener('click', () => closeModal(elements.modalApontamento));
+
+    // Apontamento Dropdowns cascaded filtering
+    document.getElementById('apontamento-project').addEventListener('change', (e) => {
+        const projectId = e.target.value;
+        const taskSelect = document.getElementById('apontamento-task');
+        const subtaskSelect = document.getElementById('apontamento-subtask');
+        
+        // Reset subtask
+        subtaskSelect.innerHTML = '<option value="">Nenhuma (Opcional)</option>';
+        subtaskSelect.disabled = true;
+        
+        if (!projectId) {
+            taskSelect.innerHTML = '<option value="" disabled selected>Selecione um projeto primeiro...</option>';
+            taskSelect.disabled = true;
+            return;
+        }
+        
+        // Filter tasks
+        const projectTasks = state.tarefas.filter(t => t.projeto_id == projectId);
+        let html = '<option value="" disabled selected>Escolha uma tarefa...</option>';
+        projectTasks.forEach(t => {
+            html += `<option value="${t.id}">${t.titulo}</option>`;
+        });
+        taskSelect.innerHTML = html;
+        taskSelect.disabled = false;
+    });
+
+    document.getElementById('apontamento-task').addEventListener('change', (e) => {
+        const taskId = e.target.value;
+        const subtaskSelect = document.getElementById('apontamento-subtask');
+        
+        if (!taskId) {
+            subtaskSelect.innerHTML = '<option value="">Nenhuma (Opcional)</option>';
+            subtaskSelect.disabled = true;
+            return;
+        }
+        
+        // Filter subtasks
+        const task = state.tarefas.find(t => t.id == taskId);
+        if (task && task.subtasks && task.subtasks.length > 0) {
+            let html = '<option value="">Nenhuma (Opcional)</option>';
+            task.subtasks.forEach(s => {
+                html += `<option value="${s.id}">${s.titulo}</option>`;
+            });
+            subtaskSelect.innerHTML = html;
+            subtaskSelect.disabled = false;
+        } else {
+            subtaskSelect.innerHTML = '<option value="">Nenhuma sub-tarefa disponível</option>';
+            subtaskSelect.disabled = true;
+        }
+    });
 }
 
 function switchTab(tabId) {
@@ -208,6 +312,10 @@ function switchTab(tabId) {
             elements.pageTitle.textContent = "Fechamento Mensal";
             elements.pageSubtitle.textContent = "Apontamento e consolidação de entregas e horas por mês";
             break;
+        case 'apontamentos-tab':
+            elements.pageTitle.textContent = "Apontamentos";
+            elements.pageSubtitle.textContent = "Apontamento diário de horas e registro de atividades";
+            break;
     }
 
     renderCurrentTab();
@@ -230,6 +338,9 @@ function renderCurrentTab() {
         case 'closing-tab':
             // Generate report automatically for current selected values
             generateMonthlyReport();
+            break;
+        case 'apontamentos-tab':
+            renderApontamentosTab();
             break;
     }
 }
@@ -287,6 +398,46 @@ function populateDropdowns() {
         });
         newSubtaskAssigneeSelect.innerHTML = subtaskColabHtml;
     }
+
+    // Apontamento Collaborators dropdown
+    const apontColabSelect = document.getElementById('apontamento-collaborator');
+    if (apontColabSelect) {
+        let colabOptionsHtml = '<option value="" disabled selected>Escolha o colaborador...</option>';
+        state.colaboradores.forEach(c => {
+            colabOptionsHtml += `<option value="${c.id}">${c.nome} (${c.coordenadoria_sigla || 'Sem Setor'})</option>`;
+        });
+        apontColabSelect.innerHTML = colabOptionsHtml;
+    }
+
+    // Apontamento Projects dropdown
+    const apontProjSelect = document.getElementById('apontamento-project');
+    if (apontProjSelect) {
+        let projOptionsHtml = '<option value="" disabled selected>Escolha o projeto...</option>';
+        state.projetos.forEach(p => {
+            projOptionsHtml += `<option value="${p.id}">${p.nome}</option>`;
+        });
+        apontProjSelect.innerHTML = projOptionsHtml;
+    }
+
+    // Meses de Fechamento option
+    const reportFechamentoSelect = elements.reportFechamento;
+    if (reportFechamentoSelect) {
+        const selectedVal = reportFechamentoSelect.value;
+        let fechamentoHtml = '';
+        if (state.mesesFechamento.length === 0) {
+            fechamentoHtml = '<option value="" disabled selected>Nenhum período cadastrado</option>';
+        } else {
+            state.mesesFechamento.forEach(f => {
+                fechamentoHtml += `<option value="${f.id}">${f.descricao}</option>`;
+            });
+        }
+        reportFechamentoSelect.innerHTML = fechamentoHtml;
+        if (selectedVal && state.mesesFechamento.some(f => f.id == selectedVal)) {
+            reportFechamentoSelect.value = selectedVal;
+        } else if (state.mesesFechamento.length > 0) {
+            reportFechamentoSelect.value = state.mesesFechamento[0].id;
+        }
+    }
 }
 
 async function updateDashboardKPIs() {
@@ -326,7 +477,7 @@ function renderDashboardTab() {
     } else {
         recentProjects.forEach(p => {
             const percent = p.total_tasks > 0 ? Math.round((p.completed_tasks / p.total_tasks) * 100) : 0;
-            const formattedDate = new Date(p.data_inicio).toLocaleDateString('pt-BR');
+            const formattedDate = formatDate(p.data_inicio);
             html += `
                 <tr>
                     <td style="font-weight: 600;">${p.nome}</td>
@@ -372,8 +523,8 @@ function renderProjectsTab() {
     } else {
         filteredProjects.forEach(p => {
             const percent = p.total_tasks > 0 ? Math.round((p.completed_tasks / p.total_tasks) * 100) : 0;
-            const startStr = new Date(p.data_inicio).toLocaleDateString('pt-BR');
-            const endStr = p.data_fim ? new Date(p.data_fim).toLocaleDateString('pt-BR') : 'Sem Prazo';
+            const startStr = formatDate(p.data_inicio);
+            const endStr = p.data_fim ? formatDate(p.data_fim) : 'Sem Prazo';
 
             html += `
                 <div class="project-card glass">
@@ -439,6 +590,24 @@ function renderTasksTab() {
     let doneCount = 0;
 
     filteredTasks.forEach(t => {
+        // Generate Subtasks HTML inside the card
+        let subtasksHtml = '';
+        if (t.subtasks && t.subtasks.length > 0) {
+            subtasksHtml = `<div class="task-card-subtasks">`;
+            t.subtasks.forEach(s => {
+                const checkedAttr = s.concluida ? 'checked' : '';
+                const completedClass = s.concluida ? 'completed' : '';
+                const assigneeName = s.colaborador_nome ? ` (${s.colaborador_nome})` : '';
+                subtasksHtml += `
+                    <div class="task-card-subtask ${completedClass}">
+                        <input type="checkbox" ${checkedAttr} onclick="event.stopPropagation(); toggleSubtask(${s.id}, this.checked)">
+                        <span title="${s.titulo}${assigneeName}">${s.titulo}</span>
+                    </div>
+                `;
+            });
+            subtasksHtml += `</div>`;
+        }
+
         const cardHtml = `
             <div class="task-card" onclick="openEditTaskModal(${t.id})">
                 <div class="task-card-header">
@@ -447,12 +616,12 @@ function renderTasksTab() {
                 </div>
                 <h5>${t.titulo}</h5>
                 <p>${t.descricao || 'Sem descrição.'}</p>
+                ${subtasksHtml}
                 <div class="task-card-footer">
                     <div class="task-assignee">
                         <i class="fa-solid fa-circle-user"></i>
                         <span>${t.colaborador_nome || 'Sem Responsável'}</span>
                     </div>
-                    <span class="task-hours">${Math.round(t.horas_trabalhadas)}/${Math.round(t.horas_estimadas)}h</span>
                 </div>
             </div>
         `;
@@ -555,17 +724,29 @@ function renderTeamTab() {
 
 // --- 5. RENDERING: MONTHLY CLOSING REPORT ---
 async function generateMonthlyReport() {
-    const mes = elements.reportMonth.value;
-    const ano = elements.reportYear.value;
-
-    // Set header labels for report
-    const monthText = elements.reportMonth.options[elements.reportMonth.selectedIndex].text;
-    const periodStr = `${monthText} / ${ano}`;
-    document.getElementById('project-report-period').textContent = periodStr;
-    document.getElementById('collaborator-report-period').textContent = periodStr;
+    const fechamentoId = elements.reportFechamento.value;
+    if (!fechamentoId) {
+        document.getElementById('report-projects-body').innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Por favor, selecione ou cadastre um período de fechamento.</td></tr>';
+        document.getElementById('report-collaborators-body').innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Por favor, selecione ou cadastre um período de fechamento.</td></tr>';
+        return;
+    }
 
     try {
-        const report = await fetch(`/api/relatorios/fechamento?mes=${mes}&ano=${ano}`).then(r => r.json());
+        const report = await fetch(`/api/relatorios/fechamento?fechamento_id=${fechamentoId}`).then(r => r.json());
+
+        if (report.error) {
+            console.error(report.error);
+            return;
+        }
+
+        // Set period description and vigency dates in header
+        const period = report.period;
+        const startStr = formatDate(period.data_inicio);
+        const endStr = formatDate(period.data_fim);
+        const periodText = `${period.descricao} (${startStr} a ${endStr})`;
+        
+        document.getElementById('project-report-period').textContent = periodText;
+        document.getElementById('collaborator-report-period').textContent = periodText;
 
         // Render Projects Summary
         let projHtml = '';
@@ -666,9 +847,7 @@ async function handleTaskSubmit(e) {
         descricao: document.getElementById('task-desc').value,
         prioridade: document.getElementById('task-priority').value,
         colaborador_id: document.getElementById('task-assignee').value,
-        data_entrega: document.getElementById('task-deadline').value,
-        horas_estimadas: parseFloat(document.getElementById('task-est-hours').value),
-        horas_trabalhadas: parseFloat(document.getElementById('task-worked-hours').value)
+        data_entrega: document.getElementById('task-deadline').value
     };
 
     try {
@@ -809,7 +988,6 @@ window.openEditTaskModal = async function(taskId) {
     document.getElementById('edit-task-id').value = task.id;
     document.getElementById('edit-task-title-display').textContent = task.titulo;
     document.getElementById('edit-task-status-select').value = task.status;
-    document.getElementById('edit-task-worked-hours').value = task.horas_trabalhadas;
 
     // Clear new subtask title input
     const subtaskTitleInput = document.getElementById('new-subtask-title');
@@ -883,9 +1061,12 @@ window.toggleSubtask = async function(subtaskId, isChecked) {
         const resTasks = await fetch('/api/tarefas').then(r => r.json());
         state.tarefas = resTasks;
         
-        // Reload current modal subtasks view
-        const taskId = parseInt(document.getElementById('edit-task-id').value);
-        await loadAndRenderSubtasks(taskId);
+        // Reload current modal subtasks view safely if the modal is open
+        const taskIdEl = document.getElementById('edit-task-id');
+        const taskId = taskIdEl && taskIdEl.value ? parseInt(taskIdEl.value) : NaN;
+        if (!isNaN(taskId)) {
+            await loadAndRenderSubtasks(taskId);
+        }
         renderCurrentTab();
     } catch (err) {
         console.error('Error toggling subtask:', err);
@@ -971,8 +1152,7 @@ async function handleEditTaskStatusSubmit(e) {
     e.preventDefault();
     const id = document.getElementById('edit-task-id').value;
     const payload = {
-        status: document.getElementById('edit-task-status-select').value,
-        horas_trabalhadas: parseFloat(document.getElementById('edit-task-worked-hours').value)
+        status: document.getElementById('edit-task-status-select').value
     };
 
     try {
@@ -1215,9 +1395,6 @@ function handleEditTaskDetailsAction() {
         document.getElementById('task-deadline').value = '';
     }
     
-    document.getElementById('task-est-hours').value = task.horas_estimadas;
-    document.getElementById('task-worked-hours').value = task.horas_trabalhadas;
-
     // Close status modal and open full edit modal
     closeModal(elements.modalEditTaskStatus);
     openModal(elements.modalTask);
@@ -1265,5 +1442,221 @@ window.deleteSubtask = async function(subtaskId) {
         }
     }
 };
+
+// --- 6. APONTAMENTOS TAB RENDERING & HANDLING ---
+function renderApontamentosTab() {
+    const searchVal = elements.apontamentoSearch.value.toLowerCase();
+    
+    const filteredApontamentos = state.apontamentos.filter(a => 
+        (a.colaborador_nome && a.colaborador_nome.toLowerCase().includes(searchVal)) || 
+        (a.projeto_nome && a.projeto_nome.toLowerCase().includes(searchVal)) ||
+        (a.tarefa_titulo && a.tarefa_titulo.toLowerCase().includes(searchVal)) ||
+        (a.subtarefa_titulo && a.subtarefa_titulo.toLowerCase().includes(searchVal)) ||
+        (a.descricao && a.descricao.toLowerCase().includes(searchVal))
+    );
+
+    let html = '';
+
+    if (filteredApontamentos.length === 0) {
+        html = `
+            <tr>
+                <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 30px;">
+                    Nenhum apontamento registrado ainda.
+                </td>
+            </tr>
+        `;
+    } else {
+        filteredApontamentos.forEach(a => {
+            const dateStr = formatDate(a.data_apontamento);
+            const horasStr = a.horas !== null && a.horas !== undefined ? `${a.horas}h` : '-';
+            html += `
+                <tr>
+                    <td style="color: var(--text-secondary);">${dateStr}</td>
+                    <td style="font-weight: 600;">${a.colaborador_nome}</td>
+                    <td><span class="project-coord-badge">${a.projeto_nome}</span></td>
+                    <td>${a.tarefa_titulo}</td>
+                    <td><span style="color: var(--text-muted);">${a.subtarefa_titulo || 'Atividade Geral'}</span></td>
+                    <td style="font-weight: 600; color: var(--accent-blue);">${horasStr}</td>
+                    <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${a.descricao}">${a.descricao}</td>
+                    <td style="text-align: right;">
+                        <button class="btn btn-danger btn-sm" onclick="deleteApontamento(${a.id})" style="padding: 4px 8px;">
+                            <i class="fa-solid fa-trash" style="font-size: 11px;"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+    elements.apontamentosList.innerHTML = html;
+}
+
+async function handleApontamentoSubmit(e) {
+    e.preventDefault();
+    const payload = {
+        colaborador_id: parseInt(document.getElementById('apontamento-collaborator').value),
+        data_apontamento: document.getElementById('apontamento-date').value,
+        projeto_id: parseInt(document.getElementById('apontamento-project').value),
+        horas: document.getElementById('apontamento-hours').value ? parseFloat(document.getElementById('apontamento-hours').value) : null,
+        tarefa_id: parseInt(document.getElementById('apontamento-task').value),
+        subtarefa_id: document.getElementById('apontamento-subtask').value ? parseInt(document.getElementById('apontamento-subtask').value) : null,
+        descricao: document.getElementById('apontamento-desc').value.trim()
+    };
+
+    try {
+        const response = await fetch('/api/apontamentos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error: ${response.status}`);
+        }
+
+        closeModal(elements.modalApontamento);
+        await loadBaseData();
+        renderCurrentTab();
+    } catch (err) {
+        console.error('Error submitting apontamento:', err);
+        alert('Erro ao registrar apontamento: ' + err.message);
+    }
+}
+
+window.deleteApontamento = async function(id) {
+    if (confirm('Deseja realmente excluir este lançamento de apontamento?')) {
+        try {
+            const response = await fetch(`/api/apontamentos/${id}`, {
+                method: 'DELETE'
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error: ${response.status}`);
+            }
+
+            await loadBaseData();
+            renderCurrentTab();
+        } catch (err) {
+            console.error('Error deleting apontamento:', err);
+            alert('Erro ao excluir apontamento: ' + err.message);
+        }
+    }
+};
+
+// --- PERIOD MANAGEMENT FUNCTIONS ---
+async function openManageFechamentosModal() {
+    renderFechamentosModalList();
+    openModal(elements.modalManageFechamentos);
+}
+
+function renderFechamentosModalList() {
+    const listEl = elements.fechamentosListTable;
+    listEl.innerHTML = '';
+
+    if (state.mesesFechamento.length === 0) {
+        listEl.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Nenhum período cadastrado.</td></tr>';
+    } else {
+        state.mesesFechamento.forEach(f => {
+            const row = document.createElement('tr');
+            const startStr = formatDate(f.data_inicio);
+            const endStr = formatDate(f.data_fim);
+            row.innerHTML = `
+                <td style="font-weight: 600;">${f.descricao}</td>
+                <td>${startStr}</td>
+                <td>${endStr}</td>
+                <td style="text-align: right;">
+                    <button type="button" class="btn btn-danger btn-sm" onclick="deleteFechamento(${f.id})" style="padding: 4px 8px;">
+                        <i class="fa-solid fa-trash" style="font-size: 11px;"></i>
+                    </button>
+                </td>
+            `;
+            listEl.appendChild(row);
+        });
+    }
+}
+
+async function handleFechamentoSubmit(e) {
+    e.preventDefault();
+    const payload = {
+        descricao: document.getElementById('fechamento-desc').value.trim(),
+        data_inicio: document.getElementById('fechamento-start').value,
+        data_fim: document.getElementById('fechamento-end').value
+    };
+
+    try {
+        const res = await fetch('/api/meses-fechamento', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        }).then(r => r.json());
+
+        if (res.error) {
+            alert('Erro ao cadastrar período: ' + res.error);
+            return;
+        }
+
+        // Reset form
+        elements.formFechamento.reset();
+        
+        // Reload base data
+        await loadBaseData();
+        
+        // Rerender modal list
+        renderFechamentosModalList();
+        
+        // Update dropdowns
+        populateDropdowns();
+        
+        // Rerender report if currently on report tab
+        renderCurrentTab();
+    } catch (err) {
+        console.error('Error submitting period:', err);
+    }
+}
+
+window.deleteFechamento = async function(id) {
+    if (confirm('Deseja realmente excluir este período de fechamento?')) {
+        try {
+            const res = await fetch(`/api/meses-fechamento/${id}`, {
+                method: 'DELETE'
+            }).then(r => r.json());
+
+            if (res.error) {
+                alert('Erro ao excluir período: ' + res.error);
+                return;
+            }
+
+            // Reload base data
+            await loadBaseData();
+            
+            // Rerender modal list
+            renderFechamentosModalList();
+            
+            // Update dropdowns
+            populateDropdowns();
+            
+            // Rerender report if currently on report tab
+            renderCurrentTab();
+        } catch (err) {
+            console.error('Error deleting period:', err);
+        }
+    }
+};
+
+// --- GENERAL HELPERS ---
+function formatDate(dateVal) {
+    if (!dateVal) return '';
+    try {
+        const isoString = typeof dateVal === 'object' ? dateVal.toISOString() : String(dateVal);
+        const datePart = isoString.split('T')[0];
+        const parts = datePart.split('-');
+        if (parts.length === 3) {
+            const [year, month, day] = parts;
+            return `${day}/${month}/${year}`;
+        }
+    } catch (e) {
+        console.error('Error formatting date:', dateVal, e);
+    }
+    return String(dateVal);
+}
 
 

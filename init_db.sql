@@ -101,6 +101,32 @@ BEGIN
         colaborador_id INT FOREIGN KEY REFERENCES Colaboradores(id) ON DELETE SET NULL
     );
 END
+
+-- Apontamentos (Time logs/Activity logs)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Apontamentos')
+BEGIN
+    CREATE TABLE Apontamentos (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        colaborador_id INT NOT NULL FOREIGN KEY REFERENCES Colaboradores(id) ON DELETE CASCADE,
+        projeto_id INT NOT NULL FOREIGN KEY REFERENCES Projetos(id) ON DELETE NO ACTION,
+        tarefa_id INT NOT NULL FOREIGN KEY REFERENCES Tarefas(id) ON DELETE CASCADE,
+        subtarefa_id INT NULL FOREIGN KEY REFERENCES SubTarefas(id) ON DELETE NO ACTION,
+        data_apontamento DATE NOT NULL,
+        horas DECIMAL(5,2) NULL,
+        descricao NVARCHAR(MAX) NOT NULL
+    );
+END
+
+-- MesesFechamento (Closing Months)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'MesesFechamento')
+BEGIN
+    CREATE TABLE MesesFechamento (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        descricao NVARCHAR(200) NOT NULL,
+        data_inicio DATE NOT NULL,
+        data_fim DATE NOT NULL
+    );
+END
 GO
 
 -- 4. SEED INITIAL MOCK DATA (IF TABLES ARE EMPTY)
@@ -214,5 +240,14 @@ BEGIN
     INSERT INTO SubTarefas (tarefa_id, titulo, concluida, colaborador_id) VALUES
     (@tar_inventario, N'Execução de scripts PowerShell nos Hyper-V', 1, @colab_diana_sub),
     (@tar_inventario, N'Preenchimento da planilha consolidada de ativos', 1, @colab_diana_sub);
+END
+
+-- Seed MesesFechamento
+IF NOT EXISTS (SELECT * FROM MesesFechamento)
+BEGIN
+    INSERT INTO MesesFechamento (descricao, data_inicio, data_fim) VALUES
+    (N'Fechamento Maio/2026', '2026-05-01', '2026-05-31'),
+    (N'Fechamento Junho/2026', '2026-06-01', '2026-06-30'),
+    (N'Fechamento Julho/2026', '2026-07-01', '2026-07-31');
 END
 GO

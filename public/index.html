@@ -36,6 +36,12 @@
                 <a href="#" class="menu-item" data-tab="closing-tab" id="nav-closing">
                     <i class="fa-solid fa-file-invoice-dollar"></i> Fechamento Mensal
                 </a>
+                <a href="#" class="menu-item" id="nav-manage-periods">
+                    <i class="fa-solid fa-calendar-days"></i> Gerenciar Períodos
+                </a>
+                <a href="#" class="menu-item" data-tab="apontamentos-tab" id="nav-apontamentos">
+                    <i class="fa-solid fa-clock"></i> Apontamentos
+                </a>
             </nav>
             <div class="sidebar-footer">
                 <p><i class="fa-solid fa-database"></i> SQL Server Ativo</p>
@@ -281,30 +287,14 @@
                     <div class="report-filters glass">
                         <div class="filter-inputs">
                             <div class="filter-input-group">
-                                <label for="report-month"><i class="fa-solid fa-calendar-days"></i> Mês:</label>
-                                <select id="report-month">
-                                    <option value="1">Janeiro</option>
-                                    <option value="2">Fevereiro</option>
-                                    <option value="3">Março</option>
-                                    <option value="4">Abril</option>
-                                    <option value="5">Maio</option>
-                                    <option value="6">Junho</option>
-                                    <option value="7">Julho</option>
-                                    <option value="8">Agosto</option>
-                                    <option value="9">Setembro</option>
-                                    <option value="10">Outubro</option>
-                                    <option value="11">Novembro</option>
-                                    <option value="12">Dezembro</option>
+                                <label for="report-fechamento"><i class="fa-solid fa-calendar-days"></i> Mês de Fechamento:</label>
+                                <select id="report-fechamento">
+                                    <option value="" disabled selected>Carregando períodos...</option>
                                 </select>
                             </div>
-                            <div class="filter-input-group">
-                                <label for="report-year">Ano:</label>
-                                <select id="report-year">
-                                    <option value="2026" selected>2026</option>
-                                    <option value="2027">2027</option>
-                                    <option value="2028">2028</option>
-                                </select>
-                            </div>
+                            <button class="btn btn-secondary" id="btn-manage-fechamentos" style="margin-left: 5px;">
+                                <i class="fa-solid fa-gear"></i> Gerenciar Períodos
+                            </button>
                             <button class="btn btn-primary" id="btn-generate-report">
                                 <i class="fa-solid fa-calculator"></i> Gerar Relatório de Fechamento
                             </button>
@@ -371,6 +361,43 @@
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+                    </div>
+                </section>
+                <!-- 6. APONTAMENTOS TAB -->
+                <section id="apontamentos-tab" class="tab-content">
+                    <div class="section-actions">
+                        <div class="search-box glass">
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <input type="text" id="apontamento-search" placeholder="Buscar nos lançamentos...">
+                        </div>
+                        <button class="btn btn-primary" id="btn-add-apontamento">
+                            <i class="fa-solid fa-clock"></i> Registrar Apontamento
+                        </button>
+                    </div>
+
+                    <div class="panel glass">
+                        <div class="panel-header">
+                            <h3>Histórico de Apontamentos</h3>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="custom-table">
+                                <thead>
+                                    <tr>
+                                        <th>Data</th>
+                                        <th>Colaborador</th>
+                                        <th>Projeto</th>
+                                        <th>Tarefa</th>
+                                        <th>Sub-tarefa</th>
+                                        <th>Horas</th>
+                                        <th>Descrição</th>
+                                        <th style="width: 80px; text-align: right;">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="apontamentos-list">
+                                    <!-- Dynamic content -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </section>
@@ -476,16 +503,6 @@
                     <div class="form-group">
                         <label for="task-deadline">Data Limite de Entrega *</label>
                         <input type="date" id="task-deadline" required>
-                    </div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="task-est-hours">Horas Estimadas *</label>
-                        <input type="number" id="task-est-hours" required min="0" step="0.5" value="8">
-                    </div>
-                    <div class="form-group">
-                        <label for="task-worked-hours">Horas Realizadas</label>
-                        <input type="number" id="task-worked-hours" min="0" step="0.5" value="0">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -601,19 +618,13 @@
                 <div class="form-group">
                     <h4 id="edit-task-title-display" style="font-family: 'Outfit'; font-weight: 600; margin-bottom: 15px;"></h4>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="edit-task-status-select">Status Atual</label>
-                        <select id="edit-task-status-select" required>
-                            <option value="A Fazer">A Fazer</option>
-                            <option value="Em Progresso">Em Progresso</option>
-                            <option value="Concluída">Concluída</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="edit-task-worked-hours">Horas Realizadas (Acumuladas)</label>
-                        <input type="number" id="edit-task-worked-hours" required min="0" step="0.5">
-                    </div>
+                <div class="form-group">
+                    <label for="edit-task-status-select">Status Atual</label>
+                    <select id="edit-task-status-select" required>
+                        <option value="A Fazer">A Fazer</option>
+                        <option value="Em Progresso">Em Progresso</option>
+                        <option value="Concluída">Concluída</option>
+                    </select>
                 </div>
 
                 <!-- Subtasks List section in task view -->
@@ -642,6 +653,123 @@
                     <button type="submit" class="btn btn-primary">Salvar Alterações</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- 6. APONTAMENTO MODAL -->
+    <div class="modal-backdrop" id="modal-apontamento">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h3 id="apontamento-modal-title">Registrar Apontamento</h3>
+                <button class="modal-close" id="btn-close-apontamento-modal">&times;</button>
+            </div>
+            <form id="form-apontamento">
+                <input type="hidden" id="apontamento-id">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="apontamento-collaborator">Colaborador *</label>
+                        <select id="apontamento-collaborator" required>
+                            <!-- Dynamic options -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="apontamento-date">Data *</label>
+                        <input type="date" id="apontamento-date" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="apontamento-project">Projeto *</label>
+                        <select id="apontamento-project" required>
+                            <!-- Dynamic options -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="apontamento-hours">Horas Trabalhadas (Opcional)</label>
+                        <input type="number" id="apontamento-hours" min="0" max="24" step="0.5" placeholder="Ex: 8">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="apontamento-task">Tarefa *</label>
+                        <select id="apontamento-task" required disabled>
+                            <option value="" disabled selected>Selecione um projeto primeiro...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="apontamento-subtask">Sub-tarefa</label>
+                        <select id="apontamento-subtask" disabled>
+                            <option value="">Nenhuma (Opcional)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="apontamento-desc">Descrição da Atividade *</label>
+                    <textarea id="apontamento-desc" rows="3" required placeholder="Descreva o que foi desenvolvido nesta atividade..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-apontamento">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Apontamento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 7. MANAGE FECHAMENTOS MODAL -->
+    <div class="modal-backdrop" id="modal-manage-fechamentos">
+        <div class="modal-content glass" style="max-width: 650px;">
+            <div class="modal-header">
+                <h3>Gerenciar Períodos de Fechamento</h3>
+                <button class="modal-close" id="btn-close-manage-fechamentos-modal">&times;</button>
+            </div>
+            
+            <!-- List of existing periods -->
+            <div style="margin-bottom: 25px;">
+                <h4 style="font-family: 'Outfit'; font-weight: 600; margin-bottom: 10px;">Períodos Cadastrados</h4>
+                <div class="table-responsive" style="max-height: 200px; overflow-y: auto; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px;">
+                    <table class="custom-table" style="margin-bottom: 0;">
+                        <thead>
+                            <tr>
+                                <th>Descrição</th>
+                                <th>Início</th>
+                                <th>Fim</th>
+                                <th style="width: 80px; text-align: right;">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fechamentos-list-table">
+                            <!-- Dynamic content -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Form to create a new period -->
+            <div class="panel glass" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 8px;">
+                <h4 style="font-family: 'Outfit'; font-weight: 600; margin-bottom: 15px;"><i class="fa-solid fa-calendar-plus"></i> Novo Período de Fechamento</h4>
+                <form id="form-fechamento">
+                    <div class="form-group">
+                        <label for="fechamento-desc">Descrição *</label>
+                        <input type="text" id="fechamento-desc" required placeholder="Ex: Fechamento Julho/2026">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="fechamento-start">Data de Início *</label>
+                            <input type="date" id="fechamento-start" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="fechamento-end">Data de Fim *</label>
+                            <input type="date" id="fechamento-end" required>
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; margin-top: 15px;">
+                        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Adicionar Período</button>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="modal-footer" style="margin-top: 15px; border-top: none; padding-top: 0;">
+                <button type="button" class="btn btn-secondary" id="btn-close-manage-fechamentos">Fechar</button>
+            </div>
         </div>
     </div>
 

@@ -980,6 +980,48 @@ button, input, select, textarea {
     border-radius: var(--radius-sm);
 }
 
+/* --- SUBTASKS INSIDE KANBAN CARDS --- */
+.task-card-subtasks {
+    margin-top: 10px;
+    margin-bottom: 12px;
+    padding-top: 10px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.task-card-subtask {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--text-secondary);
+}
+
+.task-card-subtask input[type="checkbox"] {
+    width: 13px;
+    height: 13px;
+    accent-color: var(--primary);
+    cursor: pointer;
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.task-card-subtask span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    user-select: none;
+}
+
+.task-card-subtask.completed span {
+    text-decoration: line-through;
+    color: var(--text-muted);
+}
+
 /* --- PRINT RULES (FOR EXPORT / PRINT LAYOUT) --- */
 @media print {
     body {
