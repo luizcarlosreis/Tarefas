@@ -8,6 +8,7 @@ let state = {
     apontamentos: [],
     mesesFechamento: [],
     solicitantes: [],
+    perfis: [],
     currentTab: 'dashboard-tab'
 };
 
@@ -34,6 +35,7 @@ const elements = {
     coordinationsList: document.getElementById('coordinations-list'),
     managementsList: document.getElementById('managements-list'),
     requestersList: document.getElementById('requesters-list'),
+    profilesList: document.getElementById('profiles-list'),
     apontamentosList: document.getElementById('apontamentos-list'),
     
     // Filters & Search
@@ -49,6 +51,7 @@ const elements = {
     modalCoordination: document.getElementById('modal-coordination'),
     modalManagement: document.getElementById('modal-management'),
     modalRequester: document.getElementById('modal-requester'),
+    modalProfile: document.getElementById('modal-profile'),
     modalEditTaskStatus: document.getElementById('modal-edit-task-status'),
     modalApontamento: document.getElementById('modal-apontamento'),
     modalManageFechamentos: document.getElementById('modal-manage-fechamentos'),
@@ -60,6 +63,7 @@ const elements = {
     formCoordination: document.getElementById('form-coordination'),
     formManagement: document.getElementById('form-management'),
     formRequester: document.getElementById('form-requester'),
+    formProfile: document.getElementById('form-profile'),
     formEditTaskStatus: document.getElementById('form-edit-task-status'),
     formApontamento: document.getElementById('form-apontamento'),
     formFechamento: document.getElementById('form-fechamento'),
@@ -88,7 +92,7 @@ async function initApp() {
 
 async function loadBaseData() {
     try {
-        const [resCoord, resColab, resProj, resTasks, resGerencias, resApont, resFechamentos, resSolicitantes] = await Promise.all([
+        const [resCoord, resColab, resProj, resTasks, resGerencias, resApont, resFechamentos, resSolicitantes, resPerfis] = await Promise.all([
             fetch('/api/coordenadorias').then(r => r.json()),
             fetch('/api/colaboradores').then(r => r.json()),
             fetch('/api/projetos').then(r => r.json()),
@@ -96,7 +100,8 @@ async function loadBaseData() {
             fetch('/api/gerencias').then(r => r.json()),
             fetch('/api/apontamentos').then(r => r.json()),
             fetch('/api/meses-fechamento').then(r => r.json()),
-            fetch('/api/solicitantes').then(r => r.json())
+            fetch('/api/solicitantes').then(r => r.json()),
+            fetch('/api/perfis').then(r => r.json())
         ]);
 
         state.coordenadorias = resCoord;
@@ -107,6 +112,7 @@ async function loadBaseData() {
         state.apontamentos = resApont;
         state.mesesFechamento = resFechamentos;
         state.solicitantes = resSolicitantes;
+        state.perfis = resPerfis;
 
         // Update filters and dropdowns
         populateDropdowns();
@@ -160,6 +166,12 @@ function setupEventListeners() {
         document.getElementById('requester-id').value = '';
         openModal(elements.modalRequester);
     });
+    document.getElementById('btn-add-profile').addEventListener('click', () => {
+        document.getElementById('profile-modal-title').textContent = "Registrar Perfil";
+        document.getElementById('profile-id').value = '';
+        document.getElementById('profile-name').value = '';
+        openModal(elements.modalProfile);
+    });
 
     // Modal Close buttons
     document.getElementById('btn-close-project-modal').addEventListener('click', () => closeModal(elements.modalProject));
@@ -180,6 +192,9 @@ function setupEventListeners() {
     document.getElementById('btn-close-requester-modal').addEventListener('click', () => closeModal(elements.modalRequester));
     document.getElementById('btn-cancel-requester').addEventListener('click', () => closeModal(elements.modalRequester));
 
+    document.getElementById('btn-close-profile-modal').addEventListener('click', () => closeModal(elements.modalProfile));
+    document.getElementById('btn-cancel-profile').addEventListener('click', () => closeModal(elements.modalProfile));
+
     document.getElementById('btn-close-edit-task-modal').addEventListener('click', () => closeModal(elements.modalEditTaskStatus));
     document.getElementById('btn-cancel-edit-task').addEventListener('click', () => closeModal(elements.modalEditTaskStatus));
     document.getElementById('btn-delete-task-action').addEventListener('click', handleDeleteTaskAction);
@@ -192,6 +207,7 @@ function setupEventListeners() {
     elements.formCoordination.addEventListener('submit', handleCoordinationSubmit);
     elements.formManagement.addEventListener('submit', handleManagementSubmit);
     elements.formRequester.addEventListener('submit', handleRequesterSubmit);
+    elements.formProfile.addEventListener('submit', handleProfileSubmit);
     elements.formEditTaskStatus.addEventListener('submit', handleEditTaskStatusSubmit);
     elements.formApontamento.addEventListener('submit', handleApontamentoSubmit);
 
@@ -387,6 +403,10 @@ function switchTab(tabId) {
             elements.pageTitle.textContent = "Cadastro de Solicitantes";
             elements.pageSubtitle.textContent = "Gerenciamento de solicitantes de tarefas";
             break;
+        case 'profiles-tab':
+            elements.pageTitle.textContent = "Perfis de Acesso";
+            elements.pageSubtitle.textContent = "Gerenciamento de perfis de acesso ao sistema";
+            break;
     }
 
     renderCurrentTab();
@@ -408,6 +428,9 @@ function renderCurrentTab() {
             break;
         case 'requesters-tab':
             renderRequestersTab();
+            break;
+        case 'profiles-tab':
+            renderProfilesTab();
             break;
         case 'closing-tab':
             // Generate report automatically for current selected values
@@ -853,6 +876,30 @@ function renderRequestersTab() {
     elements.requestersList.innerHTML = reqHtml;
 }
 
+function renderProfilesTab() {
+    let profHtml = '';
+    if (state.perfis.length === 0) {
+        profHtml = '<tr><td colspan="2" style="text-align: center; color: var(--text-muted);">Nenhum perfil registrado.</td></tr>';
+    } else {
+        state.perfis.forEach(p => {
+            profHtml += `
+                <tr>
+                    <td style="font-weight: 600;">${p.nome}</td>
+                    <td style="text-align: right;">
+                        <button class="btn btn-secondary btn-sm" onclick="editProfile(${p.id})" style="padding: 4px 8px; margin-right: 4px;">
+                            <i class="fa-solid fa-pen" style="font-size: 11px;"></i>
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteProfile(${p.id})" style="padding: 4px 8px;">
+                            <i class="fa-solid fa-trash" style="font-size: 11px;"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+    elements.profilesList.innerHTML = profHtml;
+}
+
 // --- 5. RENDERING: MONTHLY CLOSING REPORT ---
 async function generateMonthlyReport() {
     const fechamentoId = elements.reportFechamento.value;
@@ -1149,6 +1196,39 @@ async function handleRequesterSubmit(e) {
         renderCurrentTab();
     } catch (err) {
         console.error('Error submitting requester:', err);
+    }
+}
+
+async function handleProfileSubmit(e) {
+    e.preventDefault();
+    const id = document.getElementById('profile-id').value;
+    const payload = {
+        nome: document.getElementById('profile-name').value
+    };
+
+    try {
+        let res;
+        if (id) {
+            // Edit mode
+            res = await fetch(`/api/perfis/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(r => r.json());
+        } else {
+            // Create mode
+            res = await fetch('/api/perfis', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(r => r.json());
+        }
+
+        closeModal(elements.modalProfile);
+        await loadBaseData();
+        renderCurrentTab();
+    } catch (err) {
+        console.error('Error submitting profile:', err);
     }
 }
 
@@ -1517,6 +1597,42 @@ window.deleteRequester = async function(reqId) {
         } catch (err) {
             console.error('Error deleting requester:', err);
             alert('Erro de conexão ao tentar excluir o solicitante.');
+        }
+    }
+};
+
+// Edit profile helper
+window.editProfile = function(profileId) {
+    const prof = state.perfis.find(p => p.id === profileId);
+    if (!prof) return;
+
+    document.getElementById('profile-modal-title').textContent = "Editar Perfil";
+    document.getElementById('profile-id').value = prof.id;
+    document.getElementById('profile-name').value = prof.nome;
+
+    openModal(elements.modalProfile);
+};
+
+// Delete profile helper
+window.deleteProfile = async function(profileId) {
+    const prof = state.perfis.find(p => p.id === profileId);
+    if (!prof) return;
+
+    if (confirm(`Deseja realmente excluir o perfil "${prof.nome}"?`)) {
+        try {
+            const res = await fetch(`/api/perfis/${profileId}`, {
+                method: 'DELETE'
+            }).then(r => r.json());
+
+            if (res.error) {
+                alert('Erro ao excluir perfil: ' + res.error);
+            } else {
+                await loadBaseData();
+                renderCurrentTab();
+            }
+        } catch (err) {
+            console.error('Error deleting profile:', err);
+            alert('Erro de conexão ao tentar excluir o perfil.');
         }
     }
 };

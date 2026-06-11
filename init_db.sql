@@ -148,6 +148,15 @@ BEGIN
         data_fim DATE NOT NULL
     );
 END
+
+-- Perfis (Profiles)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Perfis')
+BEGIN
+    CREATE TABLE Perfis (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        nome NVARCHAR(100) NOT NULL UNIQUE
+    );
+END
 GO
 
 -- 4. SEED INITIAL MOCK DATA (IF TABLES ARE EMPTY)
@@ -270,5 +279,15 @@ BEGIN
     (N'Fechamento Maio/2026', '2026-05-01', '2026-05-31'),
     (N'Fechamento Junho/2026', '2026-06-01', '2026-06-30'),
     (N'Fechamento Julho/2026', '2026-07-01', '2026-07-31');
+END
+
+-- Seed Perfis
+IF NOT EXISTS (SELECT * FROM Perfis)
+BEGIN
+    INSERT INTO Perfis (nome) VALUES
+    (N'Administrador'),
+    (N'Gerência'),
+    (N'Coordenador'),
+    (N'Apontador');
 END
 GO

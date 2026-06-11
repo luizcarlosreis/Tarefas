@@ -851,6 +851,66 @@ app.delete('/api/solicitantes/:id', async (req, res) => {
     }
 });
 
+// 10. PERFIS (PROFILES)
+app.get('/api/perfis', async (req, res) => {
+    try {
+        const result = await pool.request().query('SELECT * FROM Perfis ORDER BY nome ASC');
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/perfis', async (req, res) => {
+    const { nome } = req.body;
+    try {
+        const result = await pool.request()
+            .input('nome', sql.NVarChar, nome)
+            .query(`
+                INSERT INTO Perfis (nome)
+                OUTPUT INSERTED.*
+                VALUES (@nome)
+            `);
+        res.status(201).json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/perfis/:id', async (req, res) => {
+    const { id } = req.params;
+    const { nome } = req.body;
+    try {
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .input('nome', sql.NVarChar, nome)
+            .query(`
+                UPDATE Perfis
+                SET nome = @nome
+                OUTPUT INSERTED.*
+                WHERE id = @id
+            `);
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ error: 'Profile not found.' });
+        }
+        res.json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/perfis/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.request()
+            .input('id', sql.Int, id)
+            .query('DELETE FROM Perfis WHERE id = @id');
+        res.json({ success: true, message: 'Profile deleted successfully.' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // SPA Route: fallback to index.html
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));

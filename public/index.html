@@ -36,6 +36,9 @@
                 <a href="#" class="menu-item" data-tab="requesters-tab" id="nav-requesters">
                     <i class="fa-solid fa-user-tie"></i> Solicitantes
                 </a>
+                <a href="#" class="menu-item" data-tab="profiles-tab" id="nav-profiles">
+                    <i class="fa-solid fa-id-card-clip"></i> Perfis
+                </a>
                 <a href="#" class="menu-item" data-tab="closing-tab" id="nav-closing">
                     <i class="fa-solid fa-file-invoice-dollar"></i> Fechamento Mensal
                 </a>
@@ -304,6 +307,31 @@
                                     </tr>
                                 </thead>
                                 <tbody id="requesters-list">
+                                    <!-- Dynamic content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 4.7 PROFILES TAB -->
+                <section id="profiles-tab" class="tab-content">
+                    <div class="panel glass">
+                        <div class="panel-header">
+                            <h3>Cadastro de Perfis</h3>
+                            <button class="btn btn-secondary" id="btn-add-profile">
+                                <i class="fa-solid fa-plus"></i> Novo Perfil
+                            </button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="custom-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nome do Perfil</th>
+                                        <th style="width: 150px; text-align: right;">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="profiles-list">
                                     <!-- Dynamic content -->
                                 </tbody>
                             </table>
@@ -671,6 +699,27 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="btn-cancel-requester">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 4.7 PROFILE MODAL -->
+    <div class="modal-backdrop" id="modal-profile">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h3 id="profile-modal-title">Registrar Perfil</h3>
+                <button class="modal-close" id="btn-close-profile-modal">&times;</button>
+            </div>
+            <form id="form-profile">
+                <input type="hidden" id="profile-id">
+                <div class="form-group">
+                    <label for="profile-name">Nome do Perfil *</label>
+                    <input type="text" id="profile-name" required placeholder="Ex: Gerência">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-profile">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Salvar</button>
                 </div>
             </form>
