@@ -383,6 +383,10 @@ function switchTab(tabId) {
             elements.pageTitle.textContent = "Apontamentos";
             elements.pageSubtitle.textContent = "Apontamento diário de horas e registro de atividades";
             break;
+        case 'requesters-tab':
+            elements.pageTitle.textContent = "Cadastro de Solicitantes";
+            elements.pageSubtitle.textContent = "Gerenciamento de solicitantes de tarefas";
+            break;
     }
 
     renderCurrentTab();
@@ -401,6 +405,9 @@ function renderCurrentTab() {
             break;
         case 'team-tab':
             renderTeamTab();
+            break;
+        case 'requesters-tab':
+            renderRequestersTab();
             break;
         case 'closing-tab':
             // Generate report automatically for current selected values
@@ -819,10 +826,12 @@ function renderTeamTab() {
     }
     elements.managementsList.innerHTML = mgmtHtml;
 
-    // Render Requesters (Solicitantes)
+}
+
+function renderRequestersTab() {
     let reqHtml = '';
     if (state.solicitantes.length === 0) {
-        reqHtml = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Nenhum solicitante.</td></tr>';
+        reqHtml = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Nenhum solicitante registrado.</td></tr>';
     } else {
         state.solicitantes.forEach(s => {
             reqHtml += `

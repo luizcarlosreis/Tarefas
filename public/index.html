@@ -33,6 +33,9 @@
                 <a href="#" class="menu-item" data-tab="team-tab" id="nav-team">
                     <i class="fa-solid fa-users"></i> Equipes & Setores
                 </a>
+                <a href="#" class="menu-item" data-tab="requesters-tab" id="nav-requesters">
+                    <i class="fa-solid fa-user-tie"></i> Solicitantes
+                </a>
                 <a href="#" class="menu-item" data-tab="closing-tab" id="nav-closing">
                     <i class="fa-solid fa-file-invoice-dollar"></i> Fechamento Mensal
                 </a>
@@ -279,28 +282,31 @@
                             </div>
                         </div>
 
-                        <!-- Right Panel: Solicitantes -->
-                        <div class="panel glass narrow">
-                            <div class="panel-header">
-                                <h3>Solicitantes</h3>
-                                <button class="btn btn-secondary btn-sm" id="btn-add-requester">
-                                    <i class="fa-solid fa-plus"></i> Novo Solicitante
-                                </button>
-                            </div>
-                            <div class="table-responsive">
-                                <table class="custom-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Nome</th>
-                                            <th>Setor</th>
-                                            <th style="width: 110px; text-align: right;">Ações</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="requesters-list">
-                                        <!-- Dynamic content -->
-                                    </tbody>
-                                </table>
-                            </div>
+                    </div>
+                </section>
+
+                <!-- 4.6 REQUESTERS TAB -->
+                <section id="requesters-tab" class="tab-content">
+                    <div class="panel glass">
+                        <div class="panel-header">
+                            <h3>Cadastro de Solicitantes</h3>
+                            <button class="btn btn-secondary" id="btn-add-requester">
+                                <i class="fa-solid fa-user-plus"></i> Novo Solicitante
+                            </button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="custom-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nome</th>
+                                        <th>Setor</th>
+                                        <th style="width: 150px; text-align: right;">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="requesters-list">
+                                    <!-- Dynamic content -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </section>
