@@ -132,6 +132,11 @@ function setupEventListeners() {
     document.getElementById('btn-add-collaborator').addEventListener('click', () => {
         document.getElementById('colab-modal-title').textContent = "Adicionar Novo Colaborador";
         document.getElementById('colab-id').value = '';
+        
+        // Clear project checkboxes
+        const checkboxes = document.querySelectorAll('input[name="colab-projects"]');
+        checkboxes.forEach(cb => cb.checked = false);
+        
         openModal(elements.modalCollaborator);
     });
     document.getElementById('btn-add-coordination').addEventListener('click', () => {
@@ -206,6 +211,10 @@ function setupEventListeners() {
         document.getElementById('apontamento-hours').value = '';
         document.getElementById('apontamento-desc').value = '';
         
+        const projectSelect = document.getElementById('apontamento-project');
+        projectSelect.innerHTML = '<option value="" disabled selected>Selecione um colaborador primeiro...</option>';
+        projectSelect.disabled = true;
+
         const taskSelect = document.getElementById('apontamento-task');
         taskSelect.innerHTML = '<option value="" disabled selected>Selecione um projeto primeiro...</option>';
         taskSelect.disabled = true;
@@ -219,6 +228,42 @@ function setupEventListeners() {
 
     document.getElementById('btn-close-apontamento-modal').addEventListener('click', () => closeModal(elements.modalApontamento));
     document.getElementById('btn-cancel-apontamento').addEventListener('click', () => closeModal(elements.modalApontamento));
+
+    // Filter projects based on selected collaborator's linked projects
+    document.getElementById('apontamento-collaborator').addEventListener('change', (e) => {
+        const colabId = e.target.value;
+        const projectSelect = document.getElementById('apontamento-project');
+        const taskSelect = document.getElementById('apontamento-task');
+        const subtaskSelect = document.getElementById('apontamento-subtask');
+        
+        // Reset subsequent selects
+        projectSelect.innerHTML = '<option value="" disabled selected>Escolha o projeto...</option>';
+        projectSelect.disabled = true;
+        taskSelect.innerHTML = '<option value="" disabled selected>Selecione um projeto primeiro...</option>';
+        taskSelect.disabled = true;
+        subtaskSelect.innerHTML = '<option value="">Nenhuma (Opcional)</option>';
+        subtaskSelect.disabled = true;
+
+        if (!colabId) return;
+
+        const colab = state.colaboradores.find(c => c.id == colabId);
+        if (!colab) return;
+
+        // Filter projects that are in colab.projeto_ids
+        const colabProjects = state.projetos.filter(p => colab.projeto_ids && colab.projeto_ids.includes(p.id));
+        
+        if (colabProjects.length === 0) {
+            projectSelect.innerHTML = '<option value="" disabled selected>Nenhum projeto vinculado a este colaborador</option>';
+            return;
+        }
+
+        let html = '<option value="" disabled selected>Escolha o projeto...</option>';
+        colabProjects.forEach(p => {
+            html += `<option value="${p.id}">${p.nome}</option>`;
+        });
+        projectSelect.innerHTML = html;
+        projectSelect.disabled = false;
+    });
 
     // Apontamento Dropdowns cascaded filtering
     document.getElementById('apontamento-project').addEventListener('change', (e) => {
@@ -409,14 +454,29 @@ function populateDropdowns() {
         apontColabSelect.innerHTML = colabOptionsHtml;
     }
 
-    // Apontamento Projects dropdown
+    // Apontamento Projects dropdown (Requires choosing a collaborator first)
     const apontProjSelect = document.getElementById('apontamento-project');
     if (apontProjSelect) {
-        let projOptionsHtml = '<option value="" disabled selected>Escolha o projeto...</option>';
+        apontProjSelect.innerHTML = '<option value="" disabled selected>Selecione um colaborador primeiro...</option>';
+        apontProjSelect.disabled = true;
+    }
+
+    // Populate collaborator multi-select projects checkboxes list
+    const colabProjectsList = document.getElementById('colab-projects-list');
+    if (colabProjectsList) {
+        let projectsHtml = '';
         state.projetos.forEach(p => {
-            projOptionsHtml += `<option value="${p.id}">${p.nome}</option>`;
+            projectsHtml += `
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 13.5px; cursor: pointer; user-select: none;">
+                    <input type="checkbox" name="colab-projects" value="${p.id}" style="width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; margin: 0;">
+                    <span>${p.nome}</span>
+                </label>
+            `;
         });
-        apontProjSelect.innerHTML = projOptionsHtml;
+        if (state.projetos.length === 0) {
+            projectsHtml = '<span style="color: var(--text-muted); font-size: 13px;">Nenhum projeto cadastrado no sistema.</span>';
+        }
+        colabProjectsList.innerHTML = projectsHtml;
     }
 
     // Meses de Fechamento option
@@ -878,11 +938,17 @@ async function handleTaskSubmit(e) {
 async function handleCollaboratorSubmit(e) {
     e.preventDefault();
     const id = document.getElementById('colab-id').value;
+    
+    // Collect checked project IDs
+    const checkedBoxes = document.querySelectorAll('input[name="colab-projects"]:checked');
+    const projeto_ids = Array.from(checkedBoxes).map(cb => parseInt(cb.value));
+
     const payload = {
         nome: document.getElementById('colab-name').value,
         email: document.getElementById('colab-email').value,
         cargo: document.getElementById('colab-role').value,
-        coordenadoria_id: document.getElementById('colab-coordination').value
+        coordenadoria_id: document.getElementById('colab-coordination').value,
+        projeto_ids
     };
 
     try {
@@ -1323,6 +1389,12 @@ window.editCollaborator = function(colabId) {
     document.getElementById('colab-email').value = colab.email;
     document.getElementById('colab-role').value = colab.cargo;
     document.getElementById('colab-coordination').value = colab.coordenadoria_id || '';
+
+    // Check projects checkboxes
+    const checkboxes = document.querySelectorAll('input[name="colab-projects"]');
+    checkboxes.forEach(cb => {
+        cb.checked = colab.projeto_ids && colab.projeto_ids.includes(parseInt(cb.value));
+    });
 
     openModal(elements.modalCollaborator);
 };

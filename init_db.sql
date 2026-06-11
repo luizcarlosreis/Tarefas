@@ -73,6 +73,16 @@ BEGIN
     );
 END
 
+-- ColaboradorProjetos (Junction table Collaborators <-> Projects)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ColaboradorProjetos')
+BEGIN
+    CREATE TABLE ColaboradorProjetos (
+        colaborador_id INT NOT NULL FOREIGN KEY REFERENCES Colaboradores(id) ON DELETE CASCADE,
+        projeto_id INT NOT NULL FOREIGN KEY REFERENCES Projetos(id) ON DELETE CASCADE,
+        PRIMARY KEY (colaborador_id, projeto_id)
+    );
+END
+
 -- Tarefas (Tasks)
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Tarefas')
 BEGIN

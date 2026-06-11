@@ -187,23 +187,44 @@ app.delete('/api/coordenadorias/:id', async (req, res) => {
 // 3. COLLABORATORS (COLABORADORES)
 app.get('/api/colaboradores', async (req, res) => {
     try {
-        const query = `
+        const queryColabs = `
             SELECT c.*, coord.sigla as coordenadoria_sigla, coord.nome as coordenadoria_nome 
             FROM Colaboradores c
             LEFT JOIN Coordenadorias coord ON c.coordenadoria_id = coord.id
             ORDER BY c.nome
         `;
-        const result = await pool.request().query(query);
-        res.json(result.recordset);
+        const resultColabs = await pool.request().query(queryColabs);
+        const colabs = resultColabs.recordset;
+
+        const queryLinks = `SELECT * FROM ColaboradorProjetos`;
+        const resultLinks = await pool.request().query(queryLinks);
+        const links = resultLinks.recordset;
+
+        const linksMap = {};
+        links.forEach(l => {
+            if (!linksMap[l.colaborador_id]) {
+                linksMap[l.colaborador_id] = [];
+            }
+            linksMap[l.colaborador_id].push(l.projeto_id);
+        });
+
+        colabs.forEach(c => {
+            c.projeto_ids = linksMap[c.id] || [];
+        });
+
+        res.json(colabs);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
 app.post('/api/colaboradores', async (req, res) => {
-    const { nome, email, cargo, coordenadoria_id } = req.body;
+    const { nome, email, cargo, coordenadoria_id, projeto_ids } = req.body;
+    const transaction = new sql.Transaction(pool);
     try {
-        const result = await pool.request()
+        await transaction.begin();
+        
+        const result = await transaction.request()
             .input('nome', sql.NVarChar, nome)
             .input('email', sql.NVarChar, email)
             .input('cargo', sql.NVarChar, cargo)
@@ -213,17 +234,35 @@ app.post('/api/colaboradores', async (req, res) => {
                 OUTPUT INSERTED.* 
                 VALUES (@nome, @email, @cargo, @coordenadoria_id)
             `);
-        res.status(201).json(result.recordset[0]);
+        
+        const colab = result.recordset[0];
+
+        if (projeto_ids && Array.isArray(projeto_ids)) {
+            for (const projId of projeto_ids) {
+                await transaction.request()
+                    .input('colaborador_id', sql.Int, colab.id)
+                    .input('projeto_id', sql.Int, projId)
+                    .query('INSERT INTO ColaboradorProjetos (colaborador_id, projeto_id) VALUES (@colaborador_id, @projeto_id)');
+            }
+        }
+
+        await transaction.commit();
+        colab.projeto_ids = projeto_ids || [];
+        res.status(201).json(colab);
     } catch (err) {
+        await transaction.rollback();
         res.status(500).json({ error: err.message });
     }
 });
 
 app.put('/api/colaboradores/:id', async (req, res) => {
     const { id } = req.params;
-    const { nome, email, cargo, coordenadoria_id } = req.body;
+    const { nome, email, cargo, coordenadoria_id, projeto_ids } = req.body;
+    const transaction = new sql.Transaction(pool);
     try {
-        const result = await pool.request()
+        await transaction.begin();
+        
+        const result = await transaction.request()
             .input('id', sql.Int, id)
             .input('nome', sql.NVarChar, nome)
             .input('email', sql.NVarChar, email)
@@ -235,8 +274,33 @@ app.put('/api/colaboradores/:id', async (req, res) => {
                 OUTPUT INSERTED.*
                 WHERE id = @id
             `);
-        res.json(result.recordset[0]);
+        
+        if (result.recordset.length === 0) {
+            await transaction.rollback();
+            return res.status(404).json({ error: 'Collaborator not found.' });
+        }
+
+        // Clear existing projects
+        await transaction.request()
+            .input('colaborador_id', sql.Int, id)
+            .query('DELETE FROM ColaboradorProjetos WHERE colaborador_id = @colaborador_id');
+
+        // Insert new projects
+        if (projeto_ids && Array.isArray(projeto_ids)) {
+            for (const projId of projeto_ids) {
+                await transaction.request()
+                    .input('colaborador_id', sql.Int, id)
+                    .input('projeto_id', sql.Int, projId)
+                    .query('INSERT INTO ColaboradorProjetos (colaborador_id, projeto_id) VALUES (@colaborador_id, @projeto_id)');
+            }
+        }
+
+        await transaction.commit();
+        const colab = result.recordset[0];
+        colab.projeto_ids = projeto_ids || [];
+        res.json(colab);
     } catch (err) {
+        await transaction.rollback();
         res.status(500).json({ error: err.message });
     }
 });
