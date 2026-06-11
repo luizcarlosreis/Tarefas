@@ -257,12 +257,19 @@ function setupEventListeners() {
             return;
         }
 
-        let html = '<option value="" disabled selected>Escolha o projeto...</option>';
-        colabProjects.forEach(p => {
-            html += `<option value="${p.id}">${p.nome}</option>`;
-        });
-        projectSelect.innerHTML = html;
-        projectSelect.disabled = false;
+        if (colabProjects.length === 1) {
+            const p = colabProjects[0];
+            projectSelect.innerHTML = `<option value="${p.id}" selected>${p.nome}</option>`;
+            projectSelect.disabled = false;
+            projectSelect.dispatchEvent(new Event('change'));
+        } else {
+            let html = '<option value="" disabled selected>Escolha o projeto...</option>';
+            colabProjects.forEach(p => {
+                html += `<option value="${p.id}">${p.nome}</option>`;
+            });
+            projectSelect.innerHTML = html;
+            projectSelect.disabled = false;
+        }
     });
 
     // Apontamento Dropdowns cascaded filtering
