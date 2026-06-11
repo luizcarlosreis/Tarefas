@@ -777,12 +777,13 @@ function renderTeamTab() {
     // Render Collaborators
     let colabHtml = '';
     if (state.colaboradores.length === 0) {
-        colabHtml = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Nenhum colaborador registrado.</td></tr>';
+        colabHtml = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Nenhum colaborador registrado.</td></tr>';
     } else {
         state.colaboradores.forEach(c => {
             colabHtml += `
                 <tr>
                     <td style="font-weight: 600;">${c.nome}</td>
+                    <td>${c.cpf || '-'}</td>
                     <td>${c.cargo}</td>
                     <td>${c.email}</td>
                     <td><span class="project-coord-badge">${c.coordenadoria_sigla || 'Sem Coord.'}</span></td>
@@ -1067,6 +1068,8 @@ async function handleCollaboratorSubmit(e) {
         email: document.getElementById('colab-email').value,
         cargo: document.getElementById('colab-role').value,
         coordenadoria_id: document.getElementById('colab-coordination').value,
+        cpf: document.getElementById('colab-cpf').value,
+        senha: document.getElementById('colab-password').value,
         projeto_ids
     };
 
@@ -1648,6 +1651,8 @@ window.editCollaborator = function(colabId) {
     document.getElementById('colab-email').value = colab.email;
     document.getElementById('colab-role').value = colab.cargo;
     document.getElementById('colab-coordination').value = colab.coordenadoria_id || '';
+    document.getElementById('colab-cpf').value = colab.cpf || '';
+    document.getElementById('colab-password').value = colab.senha || '';
 
     // Check projects checkboxes
     const checkboxes = document.querySelectorAll('input[name="colab-projects"]');

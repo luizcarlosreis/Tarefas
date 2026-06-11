@@ -55,7 +55,9 @@ BEGIN
         nome NVARCHAR(150) NOT NULL,
         email NVARCHAR(150) NOT NULL,
         cargo NVARCHAR(100) NOT NULL,
-        coordenadoria_id INT FOREIGN KEY REFERENCES Coordenadorias(id) ON DELETE SET NULL
+        coordenadoria_id INT FOREIGN KEY REFERENCES Coordenadorias(id) ON DELETE SET NULL,
+        cpf NVARCHAR(14) NULL,
+        senha NVARCHAR(100) NULL
     );
 END
 

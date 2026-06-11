@@ -219,7 +219,7 @@ app.get('/api/colaboradores', async (req, res) => {
 });
 
 app.post('/api/colaboradores', async (req, res) => {
-    const { nome, email, cargo, coordenadoria_id, projeto_ids } = req.body;
+    const { nome, email, cargo, coordenadoria_id, projeto_ids, cpf, senha } = req.body;
     const transaction = new sql.Transaction(pool);
     try {
         await transaction.begin();
@@ -229,10 +229,12 @@ app.post('/api/colaboradores', async (req, res) => {
             .input('email', sql.NVarChar, email)
             .input('cargo', sql.NVarChar, cargo)
             .input('coordenadoria_id', sql.Int, coordenadoria_id || null)
+            .input('cpf', sql.NVarChar, cpf || null)
+            .input('senha', sql.NVarChar, senha || null)
             .query(`
-                INSERT INTO Colaboradores (nome, email, cargo, coordenadoria_id) 
+                INSERT INTO Colaboradores (nome, email, cargo, coordenadoria_id, cpf, senha) 
                 OUTPUT INSERTED.* 
-                VALUES (@nome, @email, @cargo, @coordenadoria_id)
+                VALUES (@nome, @email, @cargo, @coordenadoria_id, @cpf, @senha)
             `);
         
         const colab = result.recordset[0];
@@ -257,7 +259,7 @@ app.post('/api/colaboradores', async (req, res) => {
 
 app.put('/api/colaboradores/:id', async (req, res) => {
     const { id } = req.params;
-    const { nome, email, cargo, coordenadoria_id, projeto_ids } = req.body;
+    const { nome, email, cargo, coordenadoria_id, projeto_ids, cpf, senha } = req.body;
     const transaction = new sql.Transaction(pool);
     try {
         await transaction.begin();
@@ -268,9 +270,11 @@ app.put('/api/colaboradores/:id', async (req, res) => {
             .input('email', sql.NVarChar, email)
             .input('cargo', sql.NVarChar, cargo)
             .input('coordenadoria_id', sql.Int, coordenadoria_id || null)
+            .input('cpf', sql.NVarChar, cpf || null)
+            .input('senha', sql.NVarChar, senha || null)
             .query(`
                 UPDATE Colaboradores
-                SET nome = @nome, email = @email, cargo = @cargo, coordenadoria_id = @coordenadoria_id
+                SET nome = @nome, email = @email, cargo = @cargo, coordenadoria_id = @coordenadoria_id, cpf = @cpf, senha = @senha
                 OUTPUT INSERTED.*
                 WHERE id = @id
             `);
