@@ -1,6 +1,6 @@
-# TaskFlow Gerência
+# Apontamento de Atividades
 
-O **TaskFlow Gerência** é um sistema web moderno e responsivo para o controle, acompanhamento e fechamento mensal de projetos e tarefas de uma gerência e suas respectivas coordenadorias.
+O **Apontamento de Atividades** é um sistema web moderno e responsivo para o controle, acompanhamento e fechamento mensal de projetos e tarefas de uma gerência e suas respectivas coordenadorias.
 
 A aplicação foi projetada com foco em experiência do usuário (UX), adotando uma interface escura estilo **Glassmorphism**, com micro-animações, cards translúcidos e painéis dinâmicos.
 
