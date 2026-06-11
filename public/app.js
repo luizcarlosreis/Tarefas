@@ -7,6 +7,7 @@ let state = {
     gerencias: [],
     apontamentos: [],
     mesesFechamento: [],
+    solicitantes: [],
     currentTab: 'dashboard-tab'
 };
 
@@ -32,6 +33,7 @@ const elements = {
     collaboratorsList: document.getElementById('collaborators-list'),
     coordinationsList: document.getElementById('coordinations-list'),
     managementsList: document.getElementById('managements-list'),
+    requestersList: document.getElementById('requesters-list'),
     apontamentosList: document.getElementById('apontamentos-list'),
     
     // Filters & Search
@@ -46,6 +48,7 @@ const elements = {
     modalCollaborator: document.getElementById('modal-collaborator'),
     modalCoordination: document.getElementById('modal-coordination'),
     modalManagement: document.getElementById('modal-management'),
+    modalRequester: document.getElementById('modal-requester'),
     modalEditTaskStatus: document.getElementById('modal-edit-task-status'),
     modalApontamento: document.getElementById('modal-apontamento'),
     modalManageFechamentos: document.getElementById('modal-manage-fechamentos'),
@@ -56,6 +59,7 @@ const elements = {
     formCollaborator: document.getElementById('form-collaborator'),
     formCoordination: document.getElementById('form-coordination'),
     formManagement: document.getElementById('form-management'),
+    formRequester: document.getElementById('form-requester'),
     formEditTaskStatus: document.getElementById('form-edit-task-status'),
     formApontamento: document.getElementById('form-apontamento'),
     formFechamento: document.getElementById('form-fechamento'),
@@ -84,14 +88,15 @@ async function initApp() {
 
 async function loadBaseData() {
     try {
-        const [resCoord, resColab, resProj, resTasks, resGerencias, resApont, resFechamentos] = await Promise.all([
+        const [resCoord, resColab, resProj, resTasks, resGerencias, resApont, resFechamentos, resSolicitantes] = await Promise.all([
             fetch('/api/coordenadorias').then(r => r.json()),
             fetch('/api/colaboradores').then(r => r.json()),
             fetch('/api/projetos').then(r => r.json()),
             fetch('/api/tarefas').then(r => r.json()),
             fetch('/api/gerencias').then(r => r.json()),
             fetch('/api/apontamentos').then(r => r.json()),
-            fetch('/api/meses-fechamento').then(r => r.json())
+            fetch('/api/meses-fechamento').then(r => r.json()),
+            fetch('/api/solicitantes').then(r => r.json())
         ]);
 
         state.coordenadorias = resCoord;
@@ -101,6 +106,7 @@ async function loadBaseData() {
         state.gerencias = resGerencias;
         state.apontamentos = resApont;
         state.mesesFechamento = resFechamentos;
+        state.solicitantes = resSolicitantes;
 
         // Update filters and dropdowns
         populateDropdowns();
@@ -149,6 +155,11 @@ function setupEventListeners() {
         document.getElementById('mgmt-id').value = '';
         openModal(elements.modalManagement);
     });
+    document.getElementById('btn-add-requester').addEventListener('click', () => {
+        document.getElementById('requester-modal-title').textContent = "Registrar Solicitante";
+        document.getElementById('requester-id').value = '';
+        openModal(elements.modalRequester);
+    });
 
     // Modal Close buttons
     document.getElementById('btn-close-project-modal').addEventListener('click', () => closeModal(elements.modalProject));
@@ -166,6 +177,9 @@ function setupEventListeners() {
     document.getElementById('btn-close-mgmt-modal').addEventListener('click', () => closeModal(elements.modalManagement));
     document.getElementById('btn-cancel-mgmt').addEventListener('click', () => closeModal(elements.modalManagement));
 
+    document.getElementById('btn-close-requester-modal').addEventListener('click', () => closeModal(elements.modalRequester));
+    document.getElementById('btn-cancel-requester').addEventListener('click', () => closeModal(elements.modalRequester));
+
     document.getElementById('btn-close-edit-task-modal').addEventListener('click', () => closeModal(elements.modalEditTaskStatus));
     document.getElementById('btn-cancel-edit-task').addEventListener('click', () => closeModal(elements.modalEditTaskStatus));
     document.getElementById('btn-delete-task-action').addEventListener('click', handleDeleteTaskAction);
@@ -177,6 +191,7 @@ function setupEventListeners() {
     elements.formCollaborator.addEventListener('submit', handleCollaboratorSubmit);
     elements.formCoordination.addEventListener('submit', handleCoordinationSubmit);
     elements.formManagement.addEventListener('submit', handleManagementSubmit);
+    elements.formRequester.addEventListener('submit', handleRequesterSubmit);
     elements.formEditTaskStatus.addEventListener('submit', handleEditTaskStatusSubmit);
     elements.formApontamento.addEventListener('submit', handleApontamentoSubmit);
 
@@ -505,6 +520,16 @@ function populateDropdowns() {
             reportFechamentoSelect.value = state.mesesFechamento[0].id;
         }
     }
+
+    // Requesters options
+    const taskRequesterSelect = document.getElementById('task-requester');
+    if (taskRequesterSelect) {
+        let reqOptionsHtml = '<option value="">Nenhum</option>';
+        state.solicitantes.forEach(s => {
+            reqOptionsHtml += `<option value="${s.id}">${s.nome} (${s.setor})</option>`;
+        });
+        taskRequesterSelect.innerHTML = reqOptionsHtml;
+    }
 }
 
 async function updateDashboardKPIs() {
@@ -689,6 +714,12 @@ function renderTasksTab() {
                         <i class="fa-solid fa-circle-user"></i>
                         <span>${t.colaborador_nome || 'Sem Responsável'}</span>
                     </div>
+                    ${t.solicitante_nome ? `
+                    <div class="task-assignee" title="Solicitante: ${t.solicitante_nome}">
+                        <i class="fa-solid fa-paper-plane" style="font-size: 10px; color: var(--text-muted);"></i>
+                        <span style="font-size: 11px; color: var(--text-muted);">${t.solicitante_nome}</span>
+                    </div>
+                    ` : ''}
                 </div>
             </div>
         `;
@@ -785,8 +816,31 @@ function renderTeamTab() {
                 </tr>
             `;
         });
-    }
     elements.managementsList.innerHTML = mgmtHtml;
+
+    // Render Requesters (Solicitantes)
+    let reqHtml = '';
+    if (state.solicitantes.length === 0) {
+        reqHtml = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Nenhum solicitante.</td></tr>';
+    } else {
+        state.solicitantes.forEach(s => {
+            reqHtml += `
+                <tr>
+                    <td style="font-weight: 600;">${s.nome}</td>
+                    <td>${s.setor}</td>
+                    <td style="text-align: right;">
+                        <button class="btn btn-secondary btn-sm" onclick="editRequester(${s.id})" style="padding: 4px 8px; margin-right: 4px;">
+                            <i class="fa-solid fa-pen" style="font-size: 11px;"></i>
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteRequester(${s.id})" style="padding: 4px 8px;">
+                            <i class="fa-solid fa-trash" style="font-size: 11px;"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+    elements.requestersList.innerHTML = reqHtml;
 }
 
 // --- 5. RENDERING: MONTHLY CLOSING REPORT ---
@@ -914,7 +968,8 @@ async function handleTaskSubmit(e) {
         descricao: document.getElementById('task-desc').value,
         prioridade: document.getElementById('task-priority').value,
         colaborador_id: document.getElementById('task-assignee').value,
-        data_entrega: document.getElementById('task-deadline').value
+        data_entrega: document.getElementById('task-deadline').value,
+        solicitante_id: document.getElementById('task-requester').value || null
     };
 
     try {
@@ -1050,6 +1105,40 @@ async function handleManagementSubmit(e) {
         renderCurrentTab();
     } catch (err) {
         console.error('Error submitting management:', err);
+    }
+}
+
+async function handleRequesterSubmit(e) {
+    e.preventDefault();
+    const id = document.getElementById('requester-id').value;
+    const payload = {
+        nome: document.getElementById('requester-name').value,
+        setor: document.getElementById('requester-sector').value
+    };
+
+    try {
+        let res;
+        if (id) {
+            // Edit mode
+            res = await fetch(`/api/solicitantes/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(r => r.json());
+        } else {
+            // Create mode
+            res = await fetch('/api/solicitantes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }).then(r => r.json());
+        }
+
+        closeModal(elements.modalRequester);
+        await loadBaseData();
+        renderCurrentTab();
+    } catch (err) {
+        console.error('Error submitting requester:', err);
     }
 }
 
@@ -1385,6 +1474,43 @@ window.deleteManagement = async function(mgmtId) {
     }
 };
 
+// Edit requester helper
+window.editRequester = function(reqId) {
+    const req = state.solicitantes.find(s => s.id === reqId);
+    if (!req) return;
+
+    document.getElementById('requester-modal-title').textContent = "Editar Solicitante";
+    document.getElementById('requester-id').value = req.id;
+    document.getElementById('requester-name').value = req.nome;
+    document.getElementById('requester-sector').value = req.setor;
+
+    openModal(elements.modalRequester);
+};
+
+// Delete requester helper
+window.deleteRequester = async function(reqId) {
+    const req = state.solicitantes.find(s => s.id === reqId);
+    if (!req) return;
+
+    if (confirm(`Deseja realmente excluir o solicitante "${req.nome}"?\nNota: Ele será desvinculado de todas as tarefas associadas.`)) {
+        try {
+            const res = await fetch(`/api/solicitantes/${reqId}`, {
+                method: 'DELETE'
+            }).then(r => r.json());
+
+            if (res.error) {
+                alert('Erro ao excluir solicitante: ' + res.error);
+            } else {
+                await loadBaseData();
+                renderCurrentTab();
+            }
+        } catch (err) {
+            console.error('Error deleting requester:', err);
+            alert('Erro de conexão ao tentar excluir o solicitante.');
+        }
+    }
+};
+
 // Edit collaborator helper
 window.editCollaborator = function(colabId) {
     const colab = state.colaboradores.find(c => c.id === colabId);
@@ -1465,6 +1591,7 @@ function handleEditTaskDetailsAction() {
     document.getElementById('task-title').value = task.titulo;
     document.getElementById('task-desc').value = task.descricao || '';
     document.getElementById('task-assignee').value = task.colaborador_id || '';
+    document.getElementById('task-requester').value = task.solicitante_id || '';
     
     // Format delivery date (YYYY-MM-DD)
     if (task.data_entrega) {

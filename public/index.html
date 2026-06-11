@@ -278,6 +278,30 @@
                                 </table>
                             </div>
                         </div>
+
+                        <!-- Right Panel: Solicitantes -->
+                        <div class="panel glass narrow">
+                            <div class="panel-header">
+                                <h3>Solicitantes</h3>
+                                <button class="btn btn-secondary btn-sm" id="btn-add-requester">
+                                    <i class="fa-solid fa-plus"></i> Novo Solicitante
+                                </button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="custom-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Nome</th>
+                                            <th>Setor</th>
+                                            <th style="width: 110px; text-align: right;">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="requesters-list">
+                                        <!-- Dynamic content -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -505,6 +529,16 @@
                         <input type="date" id="task-deadline" required>
                     </div>
                 </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="task-requester">Solicitante</label>
+                        <select id="task-requester">
+                            <option value="">Nenhum</option>
+                            <!-- Dynamic options -->
+                        </select>
+                    </div>
+                    <div class="form-group"></div>
+                </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="btn-cancel-task">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Salvar</button>
@@ -606,6 +640,31 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="btn-cancel-mgmt">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 4.6 REQUESTER MODAL -->
+    <div class="modal-backdrop" id="modal-requester">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h3 id="requester-modal-title">Registrar Solicitante</h3>
+                <button class="modal-close" id="btn-close-requester-modal">&times;</button>
+            </div>
+            <form id="form-requester">
+                <input type="hidden" id="requester-id">
+                <div class="form-group">
+                    <label for="requester-name">Nome do Solicitante *</label>
+                    <input type="text" id="requester-name" required placeholder="Ex: Maria Oliveira">
+                </div>
+                <div class="form-group">
+                    <label for="requester-sector">Setor *</label>
+                    <input type="text" id="requester-sector" required placeholder="Ex: Financeiro">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-requester">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Salvar</button>
                 </div>
             </form>

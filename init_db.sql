@@ -83,6 +83,16 @@ BEGIN
     );
 END
 
+-- Solicitantes (Requesters)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Solicitantes')
+BEGIN
+    CREATE TABLE Solicitantes (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        nome NVARCHAR(150) NOT NULL,
+        setor NVARCHAR(100) NOT NULL
+    );
+END
+
 -- Tarefas (Tasks)
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Tarefas')
 BEGIN
@@ -96,7 +106,8 @@ BEGIN
         data_entrega DATE,
         horas_estimadas DECIMAL(5,2) DEFAULT 0,
         horas_trabalhadas DECIMAL(5,2) DEFAULT 0,
-        colaborador_id INT FOREIGN KEY REFERENCES Colaboradores(id) ON DELETE SET NULL
+        colaborador_id INT FOREIGN KEY REFERENCES Colaboradores(id) ON DELETE SET NULL,
+        solicitante_id INT FOREIGN KEY REFERENCES Solicitantes(id) ON DELETE SET NULL
     );
 END
 

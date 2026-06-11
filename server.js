@@ -397,10 +397,11 @@ app.delete('/api/projetos/:id', async (req, res) => {
 app.get('/api/tarefas', async (req, res) => {
     try {
         const queryTasks = `
-            SELECT t.*, p.nome as projeto_nome, c.nome as colaborador_nome, c.email as colaborador_email
+            SELECT t.*, p.nome as projeto_nome, c.nome as colaborador_nome, c.email as colaborador_email, s.nome as solicitante_nome
             FROM Tarefas t
             JOIN Projetos p ON t.projeto_id = p.id
             LEFT JOIN Colaboradores c ON t.colaborador_id = c.id
+            LEFT JOIN Solicitantes s ON t.solicitante_id = s.id
             ORDER BY t.data_entrega ASC
         `;
         const resultTasks = await pool.request().query(queryTasks);
@@ -436,7 +437,7 @@ app.get('/api/tarefas', async (req, res) => {
 });
 
 app.post('/api/tarefas', async (req, res) => {
-    const { projeto_id, titulo, descricao, status, prioridade, data_entrega, horas_estimadas, horas_trabalhadas, colaborador_id } = req.body;
+    const { projeto_id, titulo, descricao, status, prioridade, data_entrega, horas_estimadas, horas_trabalhadas, colaborador_id, solicitante_id } = req.body;
     try {
         const result = await pool.request()
             .input('projeto_id', sql.Int, projeto_id)
@@ -448,10 +449,11 @@ app.post('/api/tarefas', async (req, res) => {
             .input('horas_estimadas', sql.Decimal(5, 2), horas_estimadas || 0)
             .input('horas_trabalhadas', sql.Decimal(5, 2), horas_trabalhadas || 0)
             .input('colaborador_id', sql.Int, colaborador_id || null)
+            .input('solicitante_id', sql.Int, solicitante_id || null)
             .query(`
-                INSERT INTO Tarefas (projeto_id, titulo, descricao, status, prioridade, data_entrega, horas_estimadas, horas_trabalhadas, colaborador_id)
+                INSERT INTO Tarefas (projeto_id, titulo, descricao, status, prioridade, data_entrega, horas_estimadas, horas_trabalhadas, colaborador_id, solicitante_id)
                 OUTPUT INSERTED.*
-                VALUES (@projeto_id, @titulo, @descricao, @status, @prioridade, @data_entrega, @horas_estimadas, @horas_trabalhadas, @colaborador_id)
+                VALUES (@projeto_id, @titulo, @descricao, @status, @prioridade, @data_entrega, @horas_estimadas, @horas_trabalhadas, @colaborador_id, @solicitante_id)
             `);
         res.status(201).json(result.recordset[0]);
     } catch (err) {
@@ -483,6 +485,7 @@ app.put('/api/tarefas/:id', async (req, res) => {
         const horas_estimadas = req.body.horas_estimadas !== undefined ? req.body.horas_estimadas : existingTask.horas_estimadas;
         const horas_trabalhadas = req.body.horas_trabalhadas !== undefined ? req.body.horas_trabalhadas : existingTask.horas_trabalhadas;
         const colaborador_id = req.body.colaborador_id !== undefined ? req.body.colaborador_id : existingTask.colaborador_id;
+        const solicitante_id = req.body.solicitante_id !== undefined ? req.body.solicitante_id : existingTask.solicitante_id;
 
         const result = await pool.request()
             .input('id', sql.Int, id)
@@ -495,12 +498,13 @@ app.put('/api/tarefas/:id', async (req, res) => {
             .input('prioridade', sql.NVarChar, prioridade)
             .input('data_entrega', sql.Date, data_entrega || null)
             .input('horas_estimadas', sql.Decimal(5, 2), horas_estimadas !== null && horas_estimadas !== undefined ? horas_estimadas : 0)
+            .input('solicitante_id', sql.Int, solicitante_id || null)
             .query(`
                 UPDATE Tarefas
                 SET projeto_id = @projeto_id, titulo = @titulo, descricao = @descricao, 
                     status = @status, prioridade = @prioridade, data_entrega = @data_entrega, 
                     horas_estimadas = @horas_estimadas, horas_trabalhadas = @horas_trabalhadas, 
-                    colaborador_id = @colaborador_id
+                    colaborador_id = @colaborador_id, solicitante_id = @solicitante_id
                 OUTPUT INSERTED.*
                 WHERE id = @id
             `);
@@ -780,6 +784,68 @@ app.delete('/api/apontamentos/:id', async (req, res) => {
             .input('id', sql.Int, id)
             .query('DELETE FROM Apontamentos WHERE id = @id');
         res.json({ success: true, message: 'Time log deleted successfully.' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 9. SOLICITANTES (REQUESTERS)
+app.get('/api/solicitantes', async (req, res) => {
+    try {
+        const result = await pool.request().query('SELECT * FROM Solicitantes ORDER BY nome ASC');
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/solicitantes', async (req, res) => {
+    const { nome, setor } = req.body;
+    try {
+        const result = await pool.request()
+            .input('nome', sql.NVarChar, nome)
+            .input('setor', sql.NVarChar, setor)
+            .query(`
+                INSERT INTO Solicitantes (nome, setor)
+                OUTPUT INSERTED.*
+                VALUES (@nome, @setor)
+            `);
+        res.status(201).json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/solicitantes/:id', async (req, res) => {
+    const { id } = req.params;
+    const { nome, setor } = req.body;
+    try {
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .input('nome', sql.NVarChar, nome)
+            .input('setor', sql.NVarChar, setor)
+            .query(`
+                UPDATE Solicitantes
+                SET nome = @nome, setor = @setor
+                OUTPUT INSERTED.*
+                WHERE id = @id
+            `);
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ error: 'Requester not found.' });
+        }
+        res.json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/solicitantes/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.request()
+            .input('id', sql.Int, id)
+            .query('DELETE FROM Solicitantes WHERE id = @id');
+        res.json({ success: true, message: 'Requester deleted successfully.' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
