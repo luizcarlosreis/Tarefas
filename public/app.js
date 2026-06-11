@@ -816,6 +816,7 @@ function renderTeamTab() {
                 </tr>
             `;
         });
+    }
     elements.managementsList.innerHTML = mgmtHtml;
 
     // Render Requesters (Solicitantes)
