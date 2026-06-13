@@ -705,7 +705,7 @@ function renderProjectsTab() {
             const endStr = p.data_fim ? formatDate(p.data_fim) : 'Sem Prazo';
 
             html += `
-                <div class="project-card glass">
+                <div class="project-card glass" ondblclick="editProject(${p.id})" style="cursor: pointer;" title="Duplo clique para editar">
                     <div class="project-card-header">
                         <div>
                             <h4>${p.nome}</h4>
@@ -837,7 +837,7 @@ function renderTeamTab() {
     } else {
         state.colaboradores.forEach(c => {
             colabHtml += `
-                <tr>
+                <tr ondblclick="editCollaborator(${c.id})" style="cursor: pointer;" title="Duplo clique para editar">
                     <td style="font-weight: 600;">${c.nome}</td>
                     <td>${c.cpf || '-'}</td>
                     <td>${c.cargo}</td>
@@ -864,7 +864,7 @@ function renderTeamTab() {
     } else {
         state.coordenadorias.forEach(c => {
             coordHtml += `
-                <tr>
+                <tr ondblclick="editCoordination(${c.id})" style="cursor: pointer;" title="Duplo clique para editar">
                     <td style="font-weight: 700; color: var(--primary-hover);">${c.sigla}</td>
                     <td>${c.nome}</td>
                     <td><span class="project-coord-badge">${c.gerencia_sigla || 'Sem Gerência'}</span></td>
@@ -889,7 +889,7 @@ function renderTeamTab() {
     } else {
         state.gerencias.forEach(g => {
             mgmtHtml += `
-                <tr>
+                <tr ondblclick="editManagement(${g.id})" style="cursor: pointer;" title="Duplo clique para editar">
                     <td style="font-weight: 700; color: var(--accent-blue);">${g.sigla}</td>
                     <td>${g.nome}</td>
                     <td style="text-align: right;">
@@ -915,7 +915,7 @@ function renderRequestersTab() {
     } else {
         state.solicitantes.forEach(s => {
             reqHtml += `
-                <tr>
+                <tr ondblclick="editRequester(${s.id})" style="cursor: pointer;" title="Duplo clique para editar">
                     <td style="font-weight: 600;">${s.nome}</td>
                     <td>${s.setor}</td>
                     <td style="text-align: right;">
