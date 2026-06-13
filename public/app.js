@@ -940,7 +940,7 @@ function renderProfilesTab() {
     } else {
         state.perfis.forEach(p => {
             profHtml += `
-                <tr>
+                <tr ondblclick="editProfile(${p.id})" style="cursor: pointer;" title="Duplo clique para editar">
                     <td style="font-weight: 600;">${p.nome}</td>
                     <td style="text-align: right;">
                         <button class="btn btn-secondary btn-sm" onclick="editProfile(${p.id})" style="padding: 4px 8px; margin-right: 4px;">
