@@ -212,6 +212,22 @@ app.get('/api/colaboradores', async (req, res) => {
             c.projeto_ids = linksMap[c.id] || [];
         });
 
+        const queryProfileLinks = `SELECT * FROM ColaboradorPerfis`;
+        const resultProfileLinks = await pool.request().query(queryProfileLinks);
+        const profileLinks = resultProfileLinks.recordset;
+
+        const profileLinksMap = {};
+        profileLinks.forEach(l => {
+            if (!profileLinksMap[l.colaborador_id]) {
+                profileLinksMap[l.colaborador_id] = [];
+            }
+            profileLinksMap[l.colaborador_id].push(l.perfil_id);
+        });
+
+        colabs.forEach(c => {
+            c.perfil_ids = profileLinksMap[c.id] || [];
+        });
+
         res.json(colabs);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -219,7 +235,7 @@ app.get('/api/colaboradores', async (req, res) => {
 });
 
 app.post('/api/colaboradores', async (req, res) => {
-    const { nome, email, cargo, coordenadoria_id, projeto_ids, cpf, senha } = req.body;
+    const { nome, email, cargo, coordenadoria_id, projeto_ids, cpf, senha, perfil_ids } = req.body;
     const transaction = new sql.Transaction(pool);
     try {
         await transaction.begin();
@@ -248,8 +264,18 @@ app.post('/api/colaboradores', async (req, res) => {
             }
         }
 
+        if (perfil_ids && Array.isArray(perfil_ids)) {
+            for (const perfId of perfil_ids) {
+                await transaction.request()
+                    .input('colaborador_id', sql.Int, colab.id)
+                    .input('perfil_id', sql.Int, perfId)
+                    .query('INSERT INTO ColaboradorPerfis (colaborador_id, perfil_id) VALUES (@colaborador_id, @perfil_id)');
+            }
+        }
+
         await transaction.commit();
         colab.projeto_ids = projeto_ids || [];
+        colab.perfil_ids = perfil_ids || [];
         res.status(201).json(colab);
     } catch (err) {
         await transaction.rollback();
@@ -259,7 +285,7 @@ app.post('/api/colaboradores', async (req, res) => {
 
 app.put('/api/colaboradores/:id', async (req, res) => {
     const { id } = req.params;
-    const { nome, email, cargo, coordenadoria_id, projeto_ids, cpf, senha } = req.body;
+    const { nome, email, cargo, coordenadoria_id, projeto_ids, cpf, senha, perfil_ids } = req.body;
     const transaction = new sql.Transaction(pool);
     try {
         await transaction.begin();
@@ -299,9 +325,25 @@ app.put('/api/colaboradores/:id', async (req, res) => {
             }
         }
 
+        // Clear existing profiles
+        await transaction.request()
+            .input('colaborador_id', sql.Int, id)
+            .query('DELETE FROM ColaboradorPerfis WHERE colaborador_id = @colaborador_id');
+
+        // Insert new profiles
+        if (perfil_ids && Array.isArray(perfil_ids)) {
+            for (const perfId of perfil_ids) {
+                await transaction.request()
+                    .input('colaborador_id', sql.Int, id)
+                    .input('perfil_id', sql.Int, perfId)
+                    .query('INSERT INTO ColaboradorPerfis (colaborador_id, perfil_id) VALUES (@colaborador_id, @perfil_id)');
+            }
+        }
+
         await transaction.commit();
         const colab = result.recordset[0];
         colab.projeto_ids = projeto_ids || [];
+        colab.perfil_ids = perfil_ids || [];
         res.json(colab);
     } catch (err) {
         await transaction.rollback();
@@ -859,33 +901,69 @@ app.delete('/api/solicitantes/:id', async (req, res) => {
 app.get('/api/perfis', async (req, res) => {
     try {
         const result = await pool.request().query('SELECT * FROM Perfis ORDER BY nome ASC');
-        res.json(result.recordset);
+        const perfis = result.recordset;
+
+        const queryLinks = `SELECT * FROM ColaboradorPerfis`;
+        const resultLinks = await pool.request().query(queryLinks);
+        const links = resultLinks.recordset;
+
+        const linksMap = {};
+        links.forEach(l => {
+            if (!linksMap[l.perfil_id]) {
+                linksMap[l.perfil_id] = [];
+            }
+            linksMap[l.perfil_id].push(l.colaborador_id);
+        });
+
+        perfis.forEach(p => {
+            p.colaborador_ids = linksMap[p.id] || [];
+        });
+
+        res.json(perfis);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
 app.post('/api/perfis', async (req, res) => {
-    const { nome } = req.body;
+    const { nome, colaborador_ids } = req.body;
+    const transaction = new sql.Transaction(pool);
     try {
-        const result = await pool.request()
+        await transaction.begin();
+        const result = await transaction.request()
             .input('nome', sql.NVarChar, nome)
             .query(`
                 INSERT INTO Perfis (nome)
                 OUTPUT INSERTED.*
                 VALUES (@nome)
             `);
-        res.status(201).json(result.recordset[0]);
+        const perfil = result.recordset[0];
+
+        if (colaborador_ids && Array.isArray(colaborador_ids)) {
+            for (const colabId of colaborador_ids) {
+                await transaction.request()
+                    .input('colaborador_id', sql.Int, colabId)
+                    .input('perfil_id', sql.Int, perfil.id)
+                    .query('INSERT INTO ColaboradorPerfis (colaborador_id, perfil_id) VALUES (@colaborador_id, @perfil_id)');
+            }
+        }
+
+        await transaction.commit();
+        perfil.colaborador_ids = colaborador_ids || [];
+        res.status(201).json(perfil);
     } catch (err) {
+        await transaction.rollback();
         res.status(500).json({ error: err.message });
     }
 });
 
 app.put('/api/perfis/:id', async (req, res) => {
     const { id } = req.params;
-    const { nome } = req.body;
+    const { nome, colaborador_ids } = req.body;
+    const transaction = new sql.Transaction(pool);
     try {
-        const result = await pool.request()
+        await transaction.begin();
+        const result = await transaction.request()
             .input('id', sql.Int, id)
             .input('nome', sql.NVarChar, nome)
             .query(`
@@ -895,10 +973,31 @@ app.put('/api/perfis/:id', async (req, res) => {
                 WHERE id = @id
             `);
         if (result.recordset.length === 0) {
+            await transaction.rollback();
             return res.status(404).json({ error: 'Profile not found.' });
         }
-        res.json(result.recordset[0]);
+
+        // Clear existing links
+        await transaction.request()
+            .input('perfil_id', sql.Int, id)
+            .query('DELETE FROM ColaboradorPerfis WHERE perfil_id = @perfil_id');
+
+        // Insert new links
+        if (colaborador_ids && Array.isArray(colaborador_ids)) {
+            for (const colabId of colaborador_ids) {
+                await transaction.request()
+                    .input('colaborador_id', sql.Int, colabId)
+                    .input('perfil_id', sql.Int, id)
+                    .query('INSERT INTO ColaboradorPerfis (colaborador_id, perfil_id) VALUES (@colaborador_id, @perfil_id)');
+            }
+        }
+
+        await transaction.commit();
+        const perfil = result.recordset[0];
+        perfil.colaborador_ids = colaborador_ids || [];
+        res.json(perfil);
     } catch (err) {
+        await transaction.rollback();
         res.status(500).json({ error: err.message });
     }
 });

@@ -622,6 +622,12 @@
                     </div>
                 </div>
                 <div class="form-group">
+                    <label style="font-weight: 500; margin-bottom: 8px; display: block;"><i class="fa-solid fa-id-card-clip"></i> Perfis Vinculados</label>
+                    <div id="colab-profiles-list" style="max-height: 120px; overflow-y: auto; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px;">
+                        <!-- Dynamic checkboxes -->
+                    </div>
+                </div>
+                <div class="form-group">
                     <label style="font-weight: 500; margin-bottom: 8px; display: block;"><i class="fa-solid fa-folder-tree"></i> Projetos Vinculados (Permitidos para Apontamento)</label>
                     <div id="colab-projects-list" style="max-height: 120px; overflow-y: auto; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 8px;">
                         <!-- Dynamic checkboxes -->
@@ -728,6 +734,41 @@
                 <div class="form-group">
                     <label for="profile-name">Nome do Perfil *</label>
                     <input type="text" id="profile-name" required placeholder="Ex: Gerência">
+                </div>
+                <div class="form-group" style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 15px;">
+                    <label style="font-weight: 600; margin-bottom: 8px; display: block;"><i class="fa-solid fa-users"></i> Vincular Colaboradores</label>
+                    <div style="display: flex; gap: 8px; align-items: flex-end; margin-bottom: 12px;">
+                        <div class="form-group" style="flex: 1; margin: 0;">
+                            <label for="profile-colab-select" style="font-size: 11px; margin-bottom: 4px;">Colaborador (Combo)</label>
+                            <select id="profile-colab-select" style="margin: 0; padding: 7px 10px;">
+                                <!-- Dynamic collaborator options -->
+                            </select>
+                        </div>
+                        <div style="padding-bottom: 10px; font-size: 11px; font-weight: bold; color: var(--text-muted);">OU</div>
+                        <div class="form-group" style="flex: 1; margin: 0;">
+                            <label for="profile-colab-cpf" style="font-size: 11px; margin-bottom: 4px;">Digite o CPF</label>
+                            <input type="text" id="profile-colab-cpf" placeholder="Ex: 000.000.000-00" style="margin: 0; padding: 7px 10px;">
+                        </div>
+                        <button type="button" class="btn btn-secondary" id="btn-profile-add-colab" style="height: 38px; padding: 0 12px; font-size: 13px;">
+                            <i class="fa-solid fa-plus"></i> Vincular
+                        </button>
+                    </div>
+                    
+                    <label style="font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 6px; display: block;">Colaboradores Vinculados ao Perfil:</label>
+                    <div style="max-height: 140px; overflow-y: auto; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 8px;">
+                        <table class="custom-table" style="font-size: 12.5px; margin: 0; background: transparent; width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th style="padding: 6px 8px;">Nome</th>
+                                    <th style="padding: 6px 8px;">CPF</th>
+                                    <th style="width: 70px; text-align: right; padding: 6px 8px;">Remover</th>
+                                </tr>
+                            </thead>
+                            <tbody id="profile-linked-colabs-body">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="btn-cancel-profile">Cancelar</button>

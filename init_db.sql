@@ -159,6 +159,16 @@ BEGIN
         nome NVARCHAR(100) NOT NULL UNIQUE
     );
 END
+
+-- ColaboradorPerfis (Collaborator-Profile Join Table)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ColaboradorPerfis')
+BEGIN
+    CREATE TABLE ColaboradorPerfis (
+        colaborador_id INT NOT NULL FOREIGN KEY REFERENCES Colaboradores(id) ON DELETE CASCADE,
+        perfil_id INT NOT NULL FOREIGN KEY REFERENCES Perfis(id) ON DELETE CASCADE,
+        PRIMARY KEY (colaborador_id, perfil_id)
+    );
+END
 GO
 
 -- 4. SEED INITIAL MOCK DATA (IF TABLES ARE EMPTY)

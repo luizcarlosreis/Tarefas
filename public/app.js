@@ -12,6 +12,8 @@ let state = {
     currentTab: 'dashboard-tab'
 };
 
+let currentProfileLinkedColabs = [];
+
 // --- DOM ELEMENTS ---
 const elements = {
     tabs: document.querySelectorAll('.tab-content'),
@@ -170,6 +172,10 @@ function setupEventListeners() {
         document.getElementById('profile-modal-title').textContent = "Registrar Perfil";
         document.getElementById('profile-id').value = '';
         document.getElementById('profile-name').value = '';
+        currentProfileLinkedColabs = [];
+        document.getElementById('profile-colab-cpf').value = '';
+        populateProfileColabDropdown();
+        renderProfileLinkedColabs();
         openModal(elements.modalProfile);
     });
 
@@ -194,6 +200,38 @@ function setupEventListeners() {
 
     document.getElementById('btn-close-profile-modal').addEventListener('click', () => closeModal(elements.modalProfile));
     document.getElementById('btn-cancel-profile').addEventListener('click', () => closeModal(elements.modalProfile));
+
+    document.getElementById('btn-profile-add-colab').addEventListener('click', () => {
+        const cpfInput = document.getElementById('profile-colab-cpf').value.trim();
+        const selectEl = document.getElementById('profile-colab-select');
+        let selectedColab = null;
+
+        if (cpfInput) {
+            // Find by CPF (ignoring non-digits)
+            selectedColab = state.colaboradores.find(c => c.cpf && c.cpf.replace(/\D/g, '') === cpfInput.replace(/\D/g, ''));
+            if (!selectedColab) {
+                alert('Colaborador com este CPF não foi encontrado.');
+                return;
+            }
+        } else if (selectEl.value) {
+            // Find by combo
+            const colabId = parseInt(selectEl.value);
+            selectedColab = state.colaboradores.find(c => c.id === colabId);
+        }
+
+        if (selectedColab) {
+            if (currentProfileLinkedColabs.includes(selectedColab.id)) {
+                alert('Este colaborador já está vinculado a este perfil.');
+            } else {
+                currentProfileLinkedColabs.push(selectedColab.id);
+                document.getElementById('profile-colab-cpf').value = '';
+                selectEl.value = '';
+                renderProfileLinkedColabs();
+            }
+        } else {
+            alert('Por favor, selecione um colaborador ou digite o CPF.');
+        }
+    });
 
     document.getElementById('btn-close-edit-task-modal').addEventListener('click', () => closeModal(elements.modalEditTaskStatus));
     document.getElementById('btn-cancel-edit-task').addEventListener('click', () => closeModal(elements.modalEditTaskStatus));
@@ -529,6 +567,24 @@ function populateDropdowns() {
             projectsHtml = '<span style="color: var(--text-muted); font-size: 13px;">Nenhum projeto cadastrado no sistema.</span>';
         }
         colabProjectsList.innerHTML = projectsHtml;
+    }
+
+    // Populate collaborator multi-select profiles checkboxes list
+    const colabProfilesList = document.getElementById('colab-profiles-list');
+    if (colabProfilesList) {
+        let profilesHtml = '';
+        state.perfis.forEach(p => {
+            profilesHtml += `
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 13.5px; cursor: pointer; user-select: none;">
+                    <input type="checkbox" name="colab-profiles" value="${p.id}" style="width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; margin: 0;">
+                    <span>${p.nome}</span>
+                </label>
+            `;
+        });
+        if (state.perfis.length === 0) {
+            profilesHtml = '<span style="color: var(--text-muted); font-size: 13px;">Nenhum perfil cadastrado no sistema.</span>';
+        }
+        colabProfilesList.innerHTML = profilesHtml;
     }
 
     // Meses de Fechamento option
@@ -901,6 +957,50 @@ function renderProfilesTab() {
     elements.profilesList.innerHTML = profHtml;
 }
 
+function renderProfileLinkedColabs() {
+    const tbody = document.getElementById('profile-linked-colabs-body');
+    if (!tbody) return;
+
+    let html = '';
+    if (currentProfileLinkedColabs.length === 0) {
+        html = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">Nenhum colaborador vinculado.</td></tr>';
+    } else {
+        currentProfileLinkedColabs.forEach(colabId => {
+            const colab = state.colaboradores.find(c => c.id === colabId);
+            if (colab) {
+                html += `
+                    <tr>
+                        <td style="padding: 6px 8px;">${colab.nome}</td>
+                        <td style="padding: 6px 8px;">${colab.cpf || '-'}</td>
+                        <td style="width: 70px; text-align: right; padding: 6px 8px;">
+                            <button type="button" class="btn btn-danger btn-sm" onclick="removeColabFromProfile(${colab.id})" style="padding: 2px 6px;">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }
+        });
+    }
+    tbody.innerHTML = html;
+}
+
+window.removeColabFromProfile = function(colabId) {
+    currentProfileLinkedColabs = currentProfileLinkedColabs.filter(id => id !== colabId);
+    renderProfileLinkedColabs();
+};
+
+function populateProfileColabDropdown() {
+    const select = document.getElementById('profile-colab-select');
+    if (!select) return;
+
+    let html = '<option value="" disabled selected>Escolha...</option>';
+    state.colaboradores.forEach(c => {
+        html += `<option value="${c.id}">${c.nome} (${c.cpf || 'Sem CPF'})</option>`;
+    });
+    select.innerHTML = html;
+}
+
 // --- 5. RENDERING: MONTHLY CLOSING REPORT ---
 async function generateMonthlyReport() {
     const fechamentoId = elements.reportFechamento.value;
@@ -1063,6 +1163,10 @@ async function handleCollaboratorSubmit(e) {
     const checkedBoxes = document.querySelectorAll('input[name="colab-projects"]:checked');
     const projeto_ids = Array.from(checkedBoxes).map(cb => parseInt(cb.value));
 
+    // Collect checked profile IDs
+    const checkedProfileBoxes = document.querySelectorAll('input[name="colab-profiles"]:checked');
+    const perfil_ids = Array.from(checkedProfileBoxes).map(cb => parseInt(cb.value));
+
     const payload = {
         nome: document.getElementById('colab-name').value,
         email: document.getElementById('colab-email').value,
@@ -1070,7 +1174,8 @@ async function handleCollaboratorSubmit(e) {
         coordenadoria_id: document.getElementById('colab-coordination').value,
         cpf: document.getElementById('colab-cpf').value,
         senha: document.getElementById('colab-password').value,
-        projeto_ids
+        projeto_ids,
+        perfil_ids
     };
 
     try {
@@ -1206,7 +1311,8 @@ async function handleProfileSubmit(e) {
     e.preventDefault();
     const id = document.getElementById('profile-id').value;
     const payload = {
-        nome: document.getElementById('profile-name').value
+        nome: document.getElementById('profile-name').value,
+        colaborador_ids: currentProfileLinkedColabs
     };
 
     try {
@@ -1613,6 +1719,11 @@ window.editProfile = function(profileId) {
     document.getElementById('profile-id').value = prof.id;
     document.getElementById('profile-name').value = prof.nome;
 
+    currentProfileLinkedColabs = [...(prof.colaborador_ids || [])];
+    document.getElementById('profile-colab-cpf').value = '';
+    populateProfileColabDropdown();
+    renderProfileLinkedColabs();
+
     openModal(elements.modalProfile);
 };
 
@@ -1658,6 +1769,12 @@ window.editCollaborator = function(colabId) {
     const checkboxes = document.querySelectorAll('input[name="colab-projects"]');
     checkboxes.forEach(cb => {
         cb.checked = colab.projeto_ids && colab.projeto_ids.includes(parseInt(cb.value));
+    });
+
+    // Check profiles checkboxes
+    const profileCheckboxes = document.querySelectorAll('input[name="colab-profiles"]');
+    profileCheckboxes.forEach(cb => {
+        cb.checked = colab.perfil_ids && colab.perfil_ids.includes(parseInt(cb.value));
     });
 
     openModal(elements.modalCollaborator);
