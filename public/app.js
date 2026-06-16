@@ -90,7 +90,25 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
 });
 
+async function loadVersion() {
+    try {
+        const res = await fetch('/api/version');
+        const data = await res.json();
+        const displays = document.querySelectorAll('.system-version-display');
+        displays.forEach(el => {
+            if (el.classList.contains('login-version')) {
+                el.textContent = `Controle de Tarefas • ${data.version}`;
+            } else {
+                el.innerHTML = `<i class="fa-solid fa-code-branch"></i> ${data.version}`;
+            }
+        });
+    } catch (err) {
+        console.error('Error loading version:', err);
+    }
+}
+
 async function initApp() {
+    loadVersion();
     // Check for stored user session
     const storedUser = localStorage.getItem('currentUser');
     if (storedUser) {

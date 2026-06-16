@@ -1,7 +1,19 @@
 const express = require('express');
 const sql = require('mssql');
 const path = require('path');
+const { execSync } = require('child_process');
 require('dotenv').config();
+
+// Load system version
+const pjson = require('./package.json');
+const systemVersion = pjson.version;
+let commitSha = '';
+try {
+    commitSha = execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+} catch (e) {
+    commitSha = process.env.GIT_COMMIT_SHA || '';
+}
+const appVersion = commitSha ? `v${systemVersion}-${commitSha}` : `v${systemVersion}`;
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -1150,6 +1162,10 @@ app.post('/api/auth/login', async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
+});
+
+app.get('/api/version', (req, res) => {
+    res.json({ version: appVersion });
 });
 
 // SPA Route: fallback to index.html
