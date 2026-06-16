@@ -69,7 +69,13 @@ app.get('/api/dashboard/summary', async (req, res) => {
 // 1.5 GERENCIAS (MANAGEMENTS)
 app.get('/api/gerencias', async (req, res) => {
     try {
-        const result = await pool.request().query('SELECT * FROM Gerencias ORDER BY nome');
+        const query = `
+            SELECT g.*, colab.nome as responsavel_nome
+            FROM Gerencias g
+            LEFT JOIN Colaboradores colab ON g.responsavel_id = colab.id
+            ORDER BY g.nome
+        `;
+        const result = await pool.request().query(query);
         res.json(result.recordset);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -77,12 +83,13 @@ app.get('/api/gerencias', async (req, res) => {
 });
 
 app.post('/api/gerencias', async (req, res) => {
-    const { nome, sigla } = req.body;
+    const { nome, sigla, responsavel_id } = req.body;
     try {
         const result = await pool.request()
             .input('nome', sql.NVarChar, nome)
             .input('sigla', sql.NVarChar, sigla)
-            .query('INSERT INTO Gerencias (nome, sigla) OUTPUT INSERTED.* VALUES (@nome, @sigla)');
+            .input('responsavel_id', sql.Int, responsavel_id || null)
+            .query('INSERT INTO Gerencias (nome, sigla, responsavel_id) OUTPUT INSERTED.* VALUES (@nome, @sigla, @responsavel_id)');
         res.status(201).json(result.recordset[0]);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -91,15 +98,16 @@ app.post('/api/gerencias', async (req, res) => {
 
 app.put('/api/gerencias/:id', async (req, res) => {
     const { id } = req.params;
-    const { nome, sigla } = req.body;
+    const { nome, sigla, responsavel_id } = req.body;
     try {
         const result = await pool.request()
             .input('id', sql.Int, id)
             .input('nome', sql.NVarChar, nome)
             .input('sigla', sql.NVarChar, sigla)
+            .input('responsavel_id', sql.Int, responsavel_id || null)
             .query(`
                 UPDATE Gerencias
-                SET nome = @nome, sigla = @sigla
+                SET nome = @nome, sigla = @sigla, responsavel_id = @responsavel_id
                 OUTPUT INSERTED.*
                 WHERE id = @id
             `);
@@ -125,9 +133,11 @@ app.delete('/api/gerencias/:id', async (req, res) => {
 app.get('/api/coordenadorias', async (req, res) => {
     try {
         const query = `
-            SELECT c.*, g.sigla as gerencia_sigla, g.nome as gerencia_nome
+            SELECT c.*, g.sigla as gerencia_sigla, g.nome as gerencia_nome,
+                   coord.nome as coordenador_nome
             FROM Coordenadorias c
             LEFT JOIN Gerencias g ON c.gerencia_id = g.id
+            LEFT JOIN Colaboradores coord ON c.coordenador_id = coord.id
             ORDER BY c.nome
         `;
         const result = await pool.request().query(query);
@@ -138,13 +148,14 @@ app.get('/api/coordenadorias', async (req, res) => {
 });
 
 app.post('/api/coordenadorias', async (req, res) => {
-    const { nome, sigla, gerencia_id } = req.body;
+    const { nome, sigla, gerencia_id, coordenador_id } = req.body;
     try {
         const result = await pool.request()
             .input('nome', sql.NVarChar, nome)
             .input('sigla', sql.NVarChar, sigla)
             .input('gerencia_id', sql.Int, gerencia_id || null)
-            .query('INSERT INTO Coordenadorias (nome, sigla, gerencia_id) OUTPUT INSERTED.* VALUES (@nome, @sigla, @gerencia_id)');
+            .input('coordenador_id', sql.Int, coordenador_id || null)
+            .query('INSERT INTO Coordenadorias (nome, sigla, gerencia_id, coordenador_id) OUTPUT INSERTED.* VALUES (@nome, @sigla, @gerencia_id, @coordenador_id)');
         res.status(201).json(result.recordset[0]);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -153,16 +164,17 @@ app.post('/api/coordenadorias', async (req, res) => {
 
 app.put('/api/coordenadorias/:id', async (req, res) => {
     const { id } = req.params;
-    const { nome, sigla, gerencia_id } = req.body;
+    const { nome, sigla, gerencia_id, coordenador_id } = req.body;
     try {
         const result = await pool.request()
             .input('id', sql.Int, id)
             .input('nome', sql.NVarChar, nome)
             .input('sigla', sql.NVarChar, sigla)
             .input('gerencia_id', sql.Int, gerencia_id || null)
+            .input('coordenador_id', sql.Int, coordenador_id || null)
             .query(`
                 UPDATE Coordenadorias
-                SET nome = @nome, sigla = @sigla, gerencia_id = @gerencia_id
+                SET nome = @nome, sigla = @sigla, gerencia_id = @gerencia_id, coordenador_id = @coordenador_id
                 OUTPUT INSERTED.*
                 WHERE id = @id
             `);
@@ -188,28 +200,17 @@ app.delete('/api/coordenadorias/:id', async (req, res) => {
 app.get('/api/colaboradores', async (req, res) => {
     try {
         const queryColabs = `
-            SELECT c.*, coord.sigla as coordenadoria_sigla, coord.nome as coordenadoria_nome 
+            SELECT c.*, coord.sigla as coordenadoria_sigla, coord.nome as coordenadoria_nome, g.sigla as gerencia_sigla, g.nome as gerencia_nome
             FROM Colaboradores c
             LEFT JOIN Coordenadorias coord ON c.coordenadoria_id = coord.id
+            INNER JOIN Gerencias g ON c.gerencia_id = g.id
             ORDER BY c.nome
         `;
         const resultColabs = await pool.request().query(queryColabs);
         const colabs = resultColabs.recordset;
 
-        const queryLinks = `SELECT * FROM ColaboradorProjetos`;
-        const resultLinks = await pool.request().query(queryLinks);
-        const links = resultLinks.recordset;
-
-        const linksMap = {};
-        links.forEach(l => {
-            if (!linksMap[l.colaborador_id]) {
-                linksMap[l.colaborador_id] = [];
-            }
-            linksMap[l.colaborador_id].push(l.projeto_id);
-        });
-
         colabs.forEach(c => {
-            c.projeto_ids = linksMap[c.id] || [];
+            c.projeto_ids = [];
         });
 
         const queryProfileLinks = `SELECT * FROM ColaboradorPerfis`;
@@ -235,7 +236,7 @@ app.get('/api/colaboradores', async (req, res) => {
 });
 
 app.post('/api/colaboradores', async (req, res) => {
-    const { nome, email, cargo, coordenadoria_id, projeto_ids, cpf, senha, perfil_ids } = req.body;
+    const { nome, email, cargo, gerencia_id, coordenadoria_id, cpf, senha, perfil_ids } = req.body;
     const transaction = new sql.Transaction(pool);
     try {
         await transaction.begin();
@@ -244,25 +245,17 @@ app.post('/api/colaboradores', async (req, res) => {
             .input('nome', sql.NVarChar, nome)
             .input('email', sql.NVarChar, email)
             .input('cargo', sql.NVarChar, cargo)
+            .input('gerencia_id', sql.Int, gerencia_id)
             .input('coordenadoria_id', sql.Int, coordenadoria_id || null)
             .input('cpf', sql.NVarChar, cpf || null)
             .input('senha', sql.NVarChar, senha || null)
             .query(`
-                INSERT INTO Colaboradores (nome, email, cargo, coordenadoria_id, cpf, senha) 
+                INSERT INTO Colaboradores (nome, email, cargo, gerencia_id, coordenadoria_id, cpf, senha) 
                 OUTPUT INSERTED.* 
-                VALUES (@nome, @email, @cargo, @coordenadoria_id, @cpf, @senha)
+                VALUES (@nome, @email, @cargo, @gerencia_id, @coordenadoria_id, @cpf, @senha)
             `);
         
         const colab = result.recordset[0];
-
-        if (projeto_ids && Array.isArray(projeto_ids)) {
-            for (const projId of projeto_ids) {
-                await transaction.request()
-                    .input('colaborador_id', sql.Int, colab.id)
-                    .input('projeto_id', sql.Int, projId)
-                    .query('INSERT INTO ColaboradorProjetos (colaborador_id, projeto_id) VALUES (@colaborador_id, @projeto_id)');
-            }
-        }
 
         if (perfil_ids && Array.isArray(perfil_ids)) {
             for (const perfId of perfil_ids) {
@@ -274,7 +267,7 @@ app.post('/api/colaboradores', async (req, res) => {
         }
 
         await transaction.commit();
-        colab.projeto_ids = projeto_ids || [];
+        colab.projeto_ids = [];
         colab.perfil_ids = perfil_ids || [];
         res.status(201).json(colab);
     } catch (err) {
@@ -285,7 +278,7 @@ app.post('/api/colaboradores', async (req, res) => {
 
 app.put('/api/colaboradores/:id', async (req, res) => {
     const { id } = req.params;
-    const { nome, email, cargo, coordenadoria_id, projeto_ids, cpf, senha, perfil_ids } = req.body;
+    const { nome, email, cargo, gerencia_id, coordenadoria_id, cpf, senha, perfil_ids } = req.body;
     const transaction = new sql.Transaction(pool);
     try {
         await transaction.begin();
@@ -295,12 +288,13 @@ app.put('/api/colaboradores/:id', async (req, res) => {
             .input('nome', sql.NVarChar, nome)
             .input('email', sql.NVarChar, email)
             .input('cargo', sql.NVarChar, cargo)
+            .input('gerencia_id', sql.Int, gerencia_id)
             .input('coordenadoria_id', sql.Int, coordenadoria_id || null)
             .input('cpf', sql.NVarChar, cpf || null)
             .input('senha', sql.NVarChar, senha || null)
             .query(`
                 UPDATE Colaboradores
-                SET nome = @nome, email = @email, cargo = @cargo, coordenadoria_id = @coordenadoria_id, cpf = @cpf, senha = @senha
+                SET nome = @nome, email = @email, cargo = @cargo, gerencia_id = @gerencia_id, coordenadoria_id = @coordenadoria_id, cpf = @cpf, senha = @senha
                 OUTPUT INSERTED.*
                 WHERE id = @id
             `);
@@ -308,21 +302,6 @@ app.put('/api/colaboradores/:id', async (req, res) => {
         if (result.recordset.length === 0) {
             await transaction.rollback();
             return res.status(404).json({ error: 'Collaborator not found.' });
-        }
-
-        // Clear existing projects
-        await transaction.request()
-            .input('colaborador_id', sql.Int, id)
-            .query('DELETE FROM ColaboradorProjetos WHERE colaborador_id = @colaborador_id');
-
-        // Insert new projects
-        if (projeto_ids && Array.isArray(projeto_ids)) {
-            for (const projId of projeto_ids) {
-                await transaction.request()
-                    .input('colaborador_id', sql.Int, id)
-                    .input('projeto_id', sql.Int, projId)
-                    .query('INSERT INTO ColaboradorProjetos (colaborador_id, projeto_id) VALUES (@colaborador_id, @projeto_id)');
-            }
         }
 
         // Clear existing profiles
@@ -342,7 +321,7 @@ app.put('/api/colaboradores/:id', async (req, res) => {
 
         await transaction.commit();
         const colab = result.recordset[0];
-        colab.projeto_ids = projeto_ids || [];
+        colab.projeto_ids = [];
         colab.perfil_ids = perfil_ids || [];
         res.json(colab);
     } catch (err) {
@@ -363,15 +342,15 @@ app.delete('/api/colaboradores/:id', async (req, res) => {
     }
 });
 
-// 4. PROJECTS (PROJETOS)
 app.get('/api/projetos', async (req, res) => {
     try {
         const query = `
-            SELECT p.*, coord.sigla as coordenadoria_sigla,
+            SELECT p.*, coord.sigla as coordenadoria_sigla, g.sigla as gerencia_sigla, g.nome as gerencia_nome,
                    (SELECT COUNT(*) FROM Tarefas WHERE projeto_id = p.id) as total_tasks,
                    (SELECT COUNT(*) FROM Tarefas WHERE projeto_id = p.id AND status = 'Concluída') as completed_tasks
             FROM Projetos p
             LEFT JOIN Coordenadorias coord ON p.coordenadoria_id = coord.id
+            INNER JOIN Gerencias g ON p.gerencia_id = g.id
             ORDER BY p.data_inicio DESC
         `;
         const result = await pool.request().query(query);
@@ -382,19 +361,20 @@ app.get('/api/projetos', async (req, res) => {
 });
 
 app.post('/api/projetos', async (req, res) => {
-    const { nome, descricao, data_inicio, data_fim, coordenadoria_id, status } = req.body;
+    const { nome, descricao, data_inicio, data_fim, gerencia_id, coordenadoria_id, status } = req.body;
     try {
         const result = await pool.request()
             .input('nome', sql.VarChar, nome)
             .input('descricao', sql.VarChar, descricao || null)
             .input('data_inicio', sql.Date, data_inicio)
             .input('data_fim', sql.Date, data_fim || null)
+            .input('gerencia_id', sql.Int, gerencia_id)
             .input('coordenadoria_id', sql.Int, coordenadoria_id || null)
             .input('status', sql.VarChar, status || 'Em Andamento')
             .query(`
-                INSERT INTO Projetos (nome, descricao, data_inicio, data_fim, coordenadoria_id, status) 
+                INSERT INTO Projetos (nome, descricao, data_inicio, data_fim, gerencia_id, coordenadoria_id, status) 
                 OUTPUT INSERTED.* 
-                VALUES (@nome, @descricao, @data_inicio, @data_fim, @coordenadoria_id, @status)
+                VALUES (@nome, @descricao, @data_inicio, @data_fim, @gerencia_id, @coordenadoria_id, @status)
             `);
         res.status(201).json(result.recordset[0]);
     } catch (err) {
@@ -404,7 +384,7 @@ app.post('/api/projetos', async (req, res) => {
 
 app.put('/api/projetos/:id', async (req, res) => {
     const { id } = req.params;
-    const { nome, descricao, data_inicio, data_fim, coordenadoria_id, status } = req.body;
+    const { nome, descricao, data_inicio, data_fim, gerencia_id, coordenadoria_id, status } = req.body;
     try {
         const result = await pool.request()
             .input('id', sql.Int, id)
@@ -412,12 +392,13 @@ app.put('/api/projetos/:id', async (req, res) => {
             .input('descricao', sql.VarChar, descricao || null)
             .input('data_inicio', sql.Date, data_inicio)
             .input('data_fim', sql.Date, data_fim || null)
+            .input('gerencia_id', sql.Int, gerencia_id)
             .input('coordenadoria_id', sql.Int, coordenadoria_id || null)
             .input('status', sql.VarChar, status)
             .query(`
                 UPDATE Projetos 
                 SET nome = @nome, descricao = @descricao, data_inicio = @data_inicio, 
-                    data_fim = @data_fim, coordenadoria_id = @coordenadoria_id, status = @status
+                    data_fim = @data_fim, gerencia_id = @gerencia_id, coordenadoria_id = @coordenadoria_id, status = @status
                 OUTPUT INSERTED.*
                 WHERE id = @id
             `);
@@ -898,6 +879,7 @@ app.delete('/api/solicitantes/:id', async (req, res) => {
 });
 
 // 10. PERFIS (PROFILES)
+// 10. PERFIS (PROFILES)
 app.get('/api/perfis', async (req, res) => {
     try {
         const result = await pool.request().query('SELECT * FROM Perfis ORDER BY nome ASC');
@@ -915,8 +897,22 @@ app.get('/api/perfis', async (req, res) => {
             linksMap[l.perfil_id].push(l.colaborador_id);
         });
 
+        // Fetch functionality mapping
+        const queryFuncLinks = `SELECT * FROM PerfilFuncionalidades`;
+        const resultFuncLinks = await pool.request().query(queryFuncLinks);
+        const funcLinks = resultFuncLinks.recordset;
+
+        const funcLinksMap = {};
+        funcLinks.forEach(fl => {
+            if (!funcLinksMap[fl.perfil_id]) {
+                funcLinksMap[fl.perfil_id] = [];
+            }
+            funcLinksMap[fl.perfil_id].push(fl.funcionalidade_id);
+        });
+
         perfis.forEach(p => {
             p.colaborador_ids = linksMap[p.id] || [];
+            p.funcionalidade_ids = funcLinksMap[p.id] || [];
         });
 
         res.json(perfis);
@@ -926,7 +922,7 @@ app.get('/api/perfis', async (req, res) => {
 });
 
 app.post('/api/perfis', async (req, res) => {
-    const { nome, colaborador_ids } = req.body;
+    const { nome, colaborador_ids, funcionalidade_ids } = req.body;
     const transaction = new sql.Transaction(pool);
     try {
         await transaction.begin();
@@ -948,8 +944,18 @@ app.post('/api/perfis', async (req, res) => {
             }
         }
 
+        if (funcionalidade_ids && Array.isArray(funcionalidade_ids)) {
+            for (const funcId of funcionalidade_ids) {
+                await transaction.request()
+                    .input('perfil_id', sql.Int, perfil.id)
+                    .input('funcionalidade_id', sql.Int, funcId)
+                    .query('INSERT INTO PerfilFuncionalidades (perfil_id, funcionalidade_id) VALUES (@perfil_id, @funcionalidade_id)');
+            }
+        }
+
         await transaction.commit();
         perfil.colaborador_ids = colaborador_ids || [];
+        perfil.funcionalidade_ids = funcionalidade_ids || [];
         res.status(201).json(perfil);
     } catch (err) {
         await transaction.rollback();
@@ -959,7 +965,7 @@ app.post('/api/perfis', async (req, res) => {
 
 app.put('/api/perfis/:id', async (req, res) => {
     const { id } = req.params;
-    const { nome, colaborador_ids } = req.body;
+    const { nome, colaborador_ids, funcionalidade_ids } = req.body;
     const transaction = new sql.Transaction(pool);
     try {
         await transaction.begin();
@@ -977,12 +983,12 @@ app.put('/api/perfis/:id', async (req, res) => {
             return res.status(404).json({ error: 'Profile not found.' });
         }
 
-        // Clear existing links
+        // Clear existing collaborator links
         await transaction.request()
             .input('perfil_id', sql.Int, id)
             .query('DELETE FROM ColaboradorPerfis WHERE perfil_id = @perfil_id');
 
-        // Insert new links
+        // Insert new collaborator links
         if (colaborador_ids && Array.isArray(colaborador_ids)) {
             for (const colabId of colaborador_ids) {
                 await transaction.request()
@@ -992,9 +998,25 @@ app.put('/api/perfis/:id', async (req, res) => {
             }
         }
 
+        // Clear existing functionality links
+        await transaction.request()
+            .input('perfil_id', sql.Int, id)
+            .query('DELETE FROM PerfilFuncionalidades WHERE perfil_id = @perfil_id');
+
+        // Insert new functionality links
+        if (funcionalidade_ids && Array.isArray(funcionalidade_ids)) {
+            for (const funcId of funcionalidade_ids) {
+                await transaction.request()
+                    .input('perfil_id', sql.Int, id)
+                    .input('funcionalidade_id', sql.Int, funcId)
+                    .query('INSERT INTO PerfilFuncionalidades (perfil_id, funcionalidade_id) VALUES (@perfil_id, @funcionalidade_id)');
+            }
+        }
+
         await transaction.commit();
         const perfil = result.recordset[0];
         perfil.colaborador_ids = colaborador_ids || [];
+        perfil.funcionalidade_ids = funcionalidade_ids || [];
         res.json(perfil);
     } catch (err) {
         await transaction.rollback();
@@ -1009,6 +1031,122 @@ app.delete('/api/perfis/:id', async (req, res) => {
             .input('id', sql.Int, id)
             .query('DELETE FROM Perfis WHERE id = @id');
         res.json({ success: true, message: 'Profile deleted successfully.' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 11. FUNCIONALIDADES (FUNCTIONALITIES)
+app.get('/api/funcionalidades', async (req, res) => {
+    try {
+        const result = await pool.request().query('SELECT * FROM Funcionalidades ORDER BY nome ASC');
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/funcionalidades', async (req, res) => {
+    const { nome, chave } = req.body;
+    try {
+        const result = await pool.request()
+            .input('nome', sql.NVarChar, nome)
+            .input('chave', sql.NVarChar, chave)
+            .query(`
+                INSERT INTO Funcionalidades (nome, chave)
+                OUTPUT INSERTED.*
+                VALUES (@nome, @chave)
+            `);
+        res.status(201).json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/funcionalidades/:id', async (req, res) => {
+    const { id } = req.params;
+    const { nome, chave } = req.body;
+    try {
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .input('nome', sql.NVarChar, nome)
+            .input('chave', sql.NVarChar, chave)
+            .query(`
+                UPDATE Funcionalidades
+                SET nome = @nome, chave = @chave
+                OUTPUT INSERTED.*
+                WHERE id = @id
+            `);
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ error: 'Functionality not found.' });
+        }
+        res.json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/funcionalidades/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.request()
+            .input('id', sql.Int, id)
+            .query('DELETE FROM Funcionalidades WHERE id = @id');
+        res.json({ success: true, message: 'Functionality deleted successfully.' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 12. AUTHENTICATION
+app.post('/api/auth/login', async (req, res) => {
+    const { cpf, senha } = req.body;
+    if (!cpf || !senha) {
+        return res.status(400).json({ error: 'CPF e senha são obrigatórios.' });
+    }
+
+    try {
+        const colabResult = await pool.request()
+            .input('cpf', sql.NVarChar, cpf)
+            .input('senha', sql.NVarChar, senha)
+            .query('SELECT * FROM Colaboradores WHERE cpf = @cpf AND senha = @senha');
+
+        if (colabResult.recordset.length === 0) {
+            return res.status(401).json({ error: 'Credenciais inválidas. Verifique seu CPF e senha.' });
+        }
+
+        const user = colabResult.recordset[0];
+
+        const profileResult = await pool.request()
+            .input('colaborador_id', sql.Int, user.id)
+            .query(`
+                SELECT p.* FROM Perfis p
+                INNER JOIN ColaboradorPerfis cp ON p.id = cp.perfil_id
+                WHERE cp.colaborador_id = @colaborador_id
+            `);
+        const profiles = profileResult.recordset;
+
+        let functionalities = [];
+        if (profiles.length > 0) {
+            const profileIds = profiles.map(p => p.id).join(',');
+            const funcResult = await pool.request()
+                .query(`
+                    SELECT DISTINCT f.chave FROM Funcionalidades f
+                    INNER JOIN PerfilFuncionalidades pf ON f.id = pf.funcionalidade_id
+                    WHERE pf.perfil_id IN (${profileIds})
+                `);
+            functionalities = funcResult.recordset.map(f => f.chave);
+        }
+
+        res.json({
+            id: user.id,
+            nome: user.nome,
+            email: user.email,
+            cargo: user.cargo,
+            coordenadoria_id: user.coordenadoria_id,
+            profiles: profiles.map(p => p.nome),
+            functionalities: functionalities
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

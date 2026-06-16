@@ -39,6 +39,9 @@
                 <a href="#" class="menu-item" data-tab="profiles-tab" id="nav-profiles">
                     <i class="fa-solid fa-id-card-clip"></i> Perfis
                 </a>
+                <a href="#" class="menu-item" data-tab="functionalities-tab" id="nav-functionalities">
+                    <i class="fa-solid fa-gears"></i> Funcionalidades
+                </a>
                 <a href="#" class="menu-item" data-tab="closing-tab" id="nav-closing">
                     <i class="fa-solid fa-file-invoice-dollar"></i> Fechamento Mensal
                 </a>
@@ -62,14 +65,19 @@
                     <h1 id="page-title">Painel Geral</h1>
                     <p id="page-subtitle">Visão unificada das coordenadorias e projetos</p>
                 </div>
-                <div class="header-profile">
-                    <div class="profile-info">
-                        <span class="profile-name">Gestor de TI</span>
-                        <span class="profile-role">Gerência Geral</span>
+                <div class="header-profile-container">
+                    <div class="header-profile">
+                        <div class="profile-info">
+                            <span class="profile-name" id="current-user-name">Gestor de TI</span>
+                            <span class="profile-role" id="current-user-role">Gerência Geral</span>
+                        </div>
+                        <div class="profile-avatar">
+                            <i class="fa-solid fa-user-tie"></i>
+                        </div>
                     </div>
-                    <div class="profile-avatar">
-                        <i class="fa-solid fa-user-tie"></i>
-                    </div>
+                    <button class="btn-logout" id="btn-logout" title="Sair do Sistema">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                    </button>
                 </div>
             </header>
 
@@ -159,11 +167,25 @@
                 <!-- 3. TASKS TAB -->
                 <section id="tasks-tab" class="tab-content">
                     <div class="section-actions">
-                        <div class="filter-group glass">
-                            <label for="task-project-filter"><i class="fa-solid fa-filter"></i> Filtrar por Projeto:</label>
-                            <select id="task-project-filter">
-                                <option value="all">Todos os Projetos</option>
-                            </select>
+                        <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center;">
+                            <div class="filter-group glass">
+                                <label for="task-gerencia-filter"><i class="fa-solid fa-building"></i> Gerência:</label>
+                                <select id="task-gerencia-filter">
+                                    <option value="all">Todas as Gerências</option>
+                                </select>
+                            </div>
+                            <div class="filter-group glass">
+                                <label for="task-coordenadoria-filter"><i class="fa-solid fa-users"></i> Coordenadoria:</label>
+                                <select id="task-coordenadoria-filter">
+                                    <option value="all">Todas as Coordenadorias</option>
+                                </select>
+                            </div>
+                            <div class="filter-group glass">
+                                <label for="task-project-filter"><i class="fa-solid fa-folder"></i> Projeto:</label>
+                                <select id="task-project-filter">
+                                    <option value="all">Todos os Projetos</option>
+                                </select>
+                            </div>
                         </div>
                         <button class="btn btn-primary" id="btn-add-task">
                             <i class="fa-solid fa-circle-plus"></i> Criar Nova Tarefa
@@ -209,8 +231,20 @@
 
                 <!-- 4. TEAM / COORD TAB -->
                 <section id="team-tab" class="tab-content">
-                    <div class="split-layout">
-                        <!-- Left Panel: Collaborators -->
+                    <div class="sub-tab-navigation">
+                        <button class="sub-tab-btn active" data-subtab="subtab-colabs">
+                            <i class="fa-solid fa-users"></i> Colaboradores
+                        </button>
+                        <button class="sub-tab-btn" data-subtab="subtab-coords">
+                            <i class="fa-solid fa-network-wired"></i> Coordenadorias
+                        </button>
+                        <button class="sub-tab-btn" data-subtab="subtab-gerencias">
+                            <i class="fa-solid fa-briefcase"></i> Gerências
+                        </button>
+                    </div>
+
+                    <!-- Sub-tab: Collaborators -->
+                    <div class="sub-tab-content active" id="subtab-colabs">
                         <div class="panel glass">
                             <div class="panel-header">
                                 <h3>Colaboradores</h3>
@@ -226,7 +260,7 @@
                                             <th>CPF</th>
                                             <th>Cargo</th>
                                             <th>Email</th>
-                                            <th>Coordenadoria</th>
+                                            <th>Gerência / Coordenadoria</th>
                                             <th style="width: 110px; text-align: right;">Ações</th>
                                         </tr>
                                     </thead>
@@ -236,9 +270,11 @@
                                 </table>
                             </div>
                         </div>
+                    </div>
 
-                        <!-- Right Panel: Coordinations -->
-                        <div class="panel glass narrow">
+                    <!-- Sub-tab: Coordinations -->
+                    <div class="sub-tab-content" id="subtab-coords">
+                        <div class="panel glass">
                             <div class="panel-header">
                                 <h3>Coordenadorias</h3>
                                 <button class="btn btn-secondary btn-sm" id="btn-add-coordination">
@@ -252,6 +288,7 @@
                                             <th>Sigla</th>
                                             <th>Nome</th>
                                             <th>Gerência</th>
+                                            <th>Coordenador</th>
                                             <th style="width: 140px; text-align: right;">Ações</th>
                                         </tr>
                                     </thead>
@@ -261,9 +298,11 @@
                                 </table>
                             </div>
                         </div>
+                    </div>
 
-                        <!-- Right Panel: Gerências -->
-                        <div class="panel glass narrow">
+                    <!-- Sub-tab: Managements -->
+                    <div class="sub-tab-content" id="subtab-gerencias">
+                        <div class="panel glass">
                             <div class="panel-header">
                                 <h3>Gerências</h3>
                                 <button class="btn btn-secondary btn-sm" id="btn-add-management">
@@ -276,6 +315,7 @@
                                         <tr>
                                             <th>Sigla</th>
                                             <th>Nome</th>
+                                            <th>Responsável</th>
                                             <th style="width: 110px; text-align: right;">Ações</th>
                                         </tr>
                                     </thead>
@@ -285,7 +325,6 @@
                                 </table>
                             </div>
                         </div>
-
                     </div>
                 </section>
 
@@ -333,6 +372,32 @@
                                     </tr>
                                 </thead>
                                 <tbody id="profiles-list">
+                                    <!-- Dynamic content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 4.8 FUNCTIONALITIES TAB -->
+                <section id="functionalities-tab" class="tab-content">
+                    <div class="panel glass">
+                        <div class="panel-header">
+                            <h3>Cadastro de Funcionalidades</h3>
+                            <button class="btn btn-secondary" id="btn-add-functionality">
+                                <i class="fa-solid fa-plus"></i> Nova Funcionalidade
+                            </button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="custom-table">
+                                <thead>
+                                    <tr>
+                                        <th>Chave de Permissão</th>
+                                        <th>Nome da Funcionalidade</th>
+                                        <th style="width: 150px; text-align: right;">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="functionalities-list">
                                     <!-- Dynamic content -->
                                 </tbody>
                             </table>
@@ -426,10 +491,20 @@
                 <!-- 6. APONTAMENTOS TAB -->
                 <section id="apontamentos-tab" class="tab-content">
                     <div class="section-actions">
-                        <div class="search-box glass">
-                            <i class="fa-solid fa-magnifying-glass"></i>
-                            <input type="text" id="apontamento-search" placeholder="Buscar nos lançamentos...">
+                        <div style="display: flex; gap: 15px; align-items: center;">
+                            <div class="search-box glass" style="margin: 0; width: 300px;">
+                                <i class="fa-solid fa-magnifying-glass"></i>
+                                <input type="text" id="apontamento-search" placeholder="Buscar nos lançamentos...">
+                            </div>
+                            
+                            <div class="filter-group glass" style="margin: 0;">
+                                <label for="apontamento-period-filter"><i class="fa-solid fa-calendar-days"></i> Período:</label>
+                                <select id="apontamento-period-filter">
+                                    <!-- Dynamic period options -->
+                                </select>
+                            </div>
                         </div>
+
                         <button class="btn btn-primary" id="btn-add-apontamento">
                             <i class="fa-solid fa-clock"></i> Registrar Apontamento
                         </button>
@@ -454,6 +529,27 @@
                                     </tr>
                                 </thead>
                                 <tbody id="apontamentos-list">
+                                    <!-- Dynamic content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Painel de Totalização por Colaborador -->
+                    <div class="panel glass" style="margin-top: 30px;">
+                        <div class="panel-header">
+                            <h3>Total de Horas por Colaborador</h3>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="custom-table">
+                                <thead>
+                                    <tr>
+                                        <th>Colaborador</th>
+                                        <th>Coordenadoria</th>
+                                        <th>Total de Horas Apontadas</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="apontamentos-colab-totals-list">
                                     <!-- Dynamic content -->
                                 </tbody>
                             </table>
@@ -496,8 +592,8 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="project-coordination">Coordenadoria Responsável *</label>
-                        <select id="project-coordination" required>
+                        <label for="project-gerencia">Gerência Responsável *</label>
+                        <select id="project-gerencia" required>
                             <!-- Dynamic options -->
                         </select>
                     </div>
@@ -509,6 +605,15 @@
                             <option value="Pendente">Pendente</option>
                             <option value="Concluído">Concluído</option>
                         </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="project-coordination">Coordenadoria Responsável</label>
+                    <select id="project-coordination">
+                        <option value="">Escolha uma gerência primeiro...</option>
+                    </select>
+                    <div id="project-coordinator-display" style="font-size: 13px; color: var(--text-muted); margin-top: 6px; display: none;">
+                        <i class="fa-solid fa-circle-user" style="font-size: 11px; margin-right: 4px;"></i>Coordenador: <span id="project-coordinator-name" style="font-weight: 500; color: var(--text-secondary);"></span>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -558,6 +663,9 @@
                         <select id="task-assignee" required>
                             <!-- Dynamic options -->
                         </select>
+                        <div id="task-coordinator-display" style="font-size: 13px; color: var(--text-muted); margin-top: 6px; display: none;">
+                            <i class="fa-solid fa-circle-user" style="font-size: 11px; margin-right: 4px;"></i>Coordenador: <span id="task-coordinator-name" style="font-weight: 500; color: var(--text-secondary);"></span>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="task-deadline">Data Limite de Entrega *</label>
@@ -615,21 +723,21 @@
                         <input type="text" id="colab-role" required placeholder="Ex: Administrador de Banco de Dados">
                     </div>
                     <div class="form-group">
-                        <label for="colab-coordination">Coordenadoria *</label>
-                        <select id="colab-coordination" required>
+                        <label for="colab-gerencia">Gerência *</label>
+                        <select id="colab-gerencia" required>
                             <!-- Dynamic options -->
                         </select>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label style="font-weight: 500; margin-bottom: 8px; display: block;"><i class="fa-solid fa-id-card-clip"></i> Perfis Vinculados</label>
-                    <div id="colab-profiles-list" style="max-height: 120px; overflow-y: auto; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px;">
-                        <!-- Dynamic checkboxes -->
-                    </div>
+                    <label for="colab-coordination">Coordenadoria</label>
+                    <select id="colab-coordination">
+                        <option value="">Escolha uma gerência primeiro...</option>
+                    </select>
                 </div>
                 <div class="form-group">
-                    <label style="font-weight: 500; margin-bottom: 8px; display: block;"><i class="fa-solid fa-folder-tree"></i> Projetos Vinculados (Permitidos para Apontamento)</label>
-                    <div id="colab-projects-list" style="max-height: 120px; overflow-y: auto; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 8px;">
+                    <label style="font-weight: 500; margin-bottom: 8px; display: block;"><i class="fa-solid fa-id-card-clip"></i> Perfis Vinculados</label>
+                    <div id="colab-profiles-list" style="max-height: 120px; overflow-y: auto; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px;">
                         <!-- Dynamic checkboxes -->
                     </div>
                 </div>
@@ -664,6 +772,12 @@
                         <!-- Dynamic options -->
                     </select>
                 </div>
+                <div class="form-group">
+                    <label for="coord-coordenador">Coordenador Vinculado</label>
+                    <select id="coord-coordenador">
+                        <!-- Dynamic options -->
+                    </select>
+                </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="btn-cancel-coord">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Salvar</button>
@@ -688,6 +802,12 @@
                 <div class="form-group">
                     <label for="mgmt-name">Nome da Gerência *</label>
                     <input type="text" id="mgmt-name" required placeholder="Ex: Gerência de Tecnologia da Informação">
+                </div>
+                <div class="form-group">
+                    <label for="mgmt-responsavel">Colaborador Responsável</label>
+                    <select id="mgmt-responsavel">
+                        <!-- Dynamic options -->
+                    </select>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="btn-cancel-mgmt">Cancelar</button>
@@ -724,7 +844,7 @@
 
     <!-- 4.7 PROFILE MODAL -->
     <div class="modal-backdrop" id="modal-profile">
-        <div class="modal-content glass">
+        <div class="modal-content modal-lg glass">
             <div class="modal-header">
                 <h3 id="profile-modal-title">Registrar Perfil</h3>
                 <button class="modal-close" id="btn-close-profile-modal">&times;</button>
@@ -734,6 +854,20 @@
                 <div class="form-group">
                     <label for="profile-name">Nome do Perfil *</label>
                     <input type="text" id="profile-name" required placeholder="Ex: Gerência">
+                </div>
+                <div class="form-group" style="margin-top: 15px;">
+                    <label style="font-weight: 600; margin-bottom: 8px; display: block;"><i class="fa-solid fa-shield-halved"></i> Funcionalidades Permitidas</label>
+                    
+                    <!-- Controles de Usabilidade -->
+                    <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
+                        <input type="text" id="profile-func-search" placeholder="Filtrar por nome ou chave..." style="margin: 0; padding: 6px 10px; font-size: 13px; flex: 1;">
+                        <button type="button" class="btn btn-secondary btn-sm" id="btn-profile-func-select-all" style="padding: 6px 10px; font-size: 11px; white-space: nowrap; height: 38px;">Selecionar Todas</button>
+                        <button type="button" class="btn btn-secondary btn-sm" id="btn-profile-func-clear-all" style="padding: 6px 10px; font-size: 11px; white-space: nowrap; height: 38px;">Limpar</button>
+                    </div>
+
+                    <div id="profile-functionalities-list" style="max-height: 280px; overflow-y: auto; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 12px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                        <!-- Dynamic checkboxes for functionalities -->
+                    </div>
                 </div>
                 <div class="form-group" style="margin-top: 20px; border-top: 1px solid var(--border-color); padding-top: 15px;">
                     <label style="font-weight: 600; margin-bottom: 8px; display: block;"><i class="fa-solid fa-users"></i> Vincular Colaboradores</label>
@@ -942,6 +1076,57 @@
             <div class="modal-footer" style="margin-top: 15px; border-top: none; padding-top: 0;">
                 <button type="button" class="btn btn-secondary" id="btn-close-manage-fechamentos">Fechar</button>
             </div>
+        </div>
+    </div>
+
+    <!-- 8. FUNCTIONALITY MODAL -->
+    <div class="modal-backdrop" id="modal-functionality">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h3 id="functionality-modal-title">Registrar Funcionalidade</h3>
+                <button class="modal-close" id="btn-close-functionality-modal">&times;</button>
+            </div>
+            <form id="form-functionality">
+                <input type="hidden" id="functionality-id">
+                <div class="form-group">
+                    <label for="functionality-key">Chave de Permissão *</label>
+                    <input type="text" id="functionality-key" required placeholder="Ex: projetos">
+                </div>
+                <div class="form-group">
+                    <label for="functionality-name">Nome Exibido no Menu *</label>
+                    <input type="text" id="functionality-name" required placeholder="Ex: Projetos">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-functionality">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- LOGIN SCREEN OVERLAY -->
+    <div class="login-backdrop" id="login-screen">
+        <div class="login-card glass">
+            <div class="login-logo">
+                <i class="fa-solid fa-shield-halved logo-icon"></i>
+                <h2>Controle de <span>Tarefas</span></h2>
+            </div>
+            <p class="login-subtitle">Entre com suas credenciais de colaborador para acessar o sistema</p>
+            <div class="login-error" id="login-error-msg">Credenciais inválidas. Tente novamente.</div>
+            <form id="form-login">
+                <div class="form-group" style="text-align: left;">
+                    <label for="login-cpf">CPF *</label>
+                    <input type="text" id="login-cpf" required placeholder="Ex: 000.000.000-00">
+                </div>
+                <div class="form-group" style="text-align: left;">
+                    <label for="login-password">Senha *</label>
+                    <input type="password" id="login-password" required placeholder="Sua senha">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; height: 44px; margin-top: 15px;">
+                    <i class="fa-solid fa-right-to-bracket"></i> Acessar Sistema
+                </button>
+            </form>
+
         </div>
     </div>
 
