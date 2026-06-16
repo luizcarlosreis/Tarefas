@@ -10,7 +10,8 @@ let state = {
     perfis: [],
     funcionalidades: [],
     currentUser: null,
-    currentTab: 'dashboard-tab'
+    currentTab: 'dashboard-tab',
+    currentReport: null
 };
 
 let currentProfileLinkedColabs = [];
@@ -412,9 +413,22 @@ function setupEventListeners() {
         elements.reportFechamento.addEventListener('change', generateMonthlyReport);
     }
     
-    // Reports trigger
     document.getElementById('btn-generate-report').addEventListener('click', generateMonthlyReport);
     document.getElementById('btn-print-report').addEventListener('click', () => window.print());
+
+    const reportGerenciaFilter = document.getElementById('report-gerencia-filter');
+    if (reportGerenciaFilter) {
+        reportGerenciaFilter.addEventListener('change', (e) => {
+            updateReportCoordinationDropdown(e.target.value);
+            renderReportTables();
+        });
+    }
+    const reportCoordenadoriaFilter = document.getElementById('report-coordenadoria-filter');
+    if (reportCoordenadoriaFilter) {
+        reportCoordenadoriaFilter.addEventListener('change', () => {
+            renderReportTables();
+        });
+    }
     
     // Closing periods management triggers
     document.getElementById('btn-manage-fechamentos').addEventListener('click', openManageFechamentosModal);
@@ -970,6 +984,30 @@ function updateColabCoordinationDropdown(gerenciaId, selectedCoordId = '') {
     }
 }
 
+function updateReportCoordinationDropdown(gerenciaId) {
+    const reportCoordSelect = document.getElementById('report-coordenadoria-filter');
+    if (!reportCoordSelect) return;
+
+    let html = '<option value="all">Todas as Coordenadorias</option>';
+    let coordsToPopulate = state.coordenadorias;
+
+    if (gerenciaId && gerenciaId !== 'all') {
+        coordsToPopulate = state.coordenadorias.filter(c => c.gerencia_id == gerenciaId);
+    }
+
+    coordsToPopulate.forEach(c => {
+        html += `<option value="${c.id}">${c.sigla} - ${c.nome}</option>`;
+    });
+
+    reportCoordSelect.innerHTML = html;
+    reportCoordSelect.value = 'all';
+
+    // Auto-select if only 1 option (excluding 'all')
+    if (coordsToPopulate.length === 1) {
+        reportCoordSelect.value = coordsToPopulate[0].id;
+    }
+}
+
 function populateDropdowns() {
     // Project Gerência dropdown
     const projGerenciaSelect = document.getElementById('project-gerencia');
@@ -1107,6 +1145,26 @@ function populateDropdowns() {
             reportFechamentoSelect.value = selectedVal;
         } else if (state.mesesFechamento.length > 0) {
             reportFechamentoSelect.value = state.mesesFechamento[0].id;
+        }
+    }
+
+    // Report filters (Monthly Closing)
+    const reportGerenciaFilter = document.getElementById('report-gerencia-filter');
+    if (reportGerenciaFilter) {
+        let html = '<option value="all">Todas as Gerências</option>';
+        state.gerencias.forEach(g => {
+            html += `<option value="${g.id}">${g.sigla} - ${g.nome}</option>`;
+        });
+        reportGerenciaFilter.innerHTML = html;
+        
+        if (state.gerencias.length === 1) {
+            reportGerenciaFilter.value = state.gerencias[0].id;
+            reportGerenciaFilter.disabled = true; // Deixar fixo
+            updateReportCoordinationDropdown(state.gerencias[0].id);
+        } else {
+            reportGerenciaFilter.value = 'all';
+            reportGerenciaFilter.disabled = false;
+            updateReportCoordinationDropdown('all');
         }
     }
 
@@ -1608,72 +1666,113 @@ async function generateMonthlyReport() {
             return;
         }
 
-        // Set period description and vigency dates in header
-        const period = report.period;
-        const startStr = formatDate(period.data_inicio);
-        const endStr = formatDate(period.data_fim);
-        const periodText = `${period.descricao} (${startStr} a ${endStr})`;
-        
-        document.getElementById('project-report-period').textContent = periodText;
-        document.getElementById('collaborator-report-period').textContent = periodText;
-
-        // Render Projects Summary
-        let projHtml = '';
-        if (report.projetos.length === 0) {
-            projHtml = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Nenhuma tarefa agendada ou executada para este período.</td></tr>';
-        } else {
-            report.projetos.forEach(p => {
-                const estHours = p.total_horas_estimadas ? Math.round(p.total_horas_estimadas) : 0;
-                const workedHours = p.total_horas_trabalhadas ? Math.round(p.total_horas_trabalhadas) : 0;
-                
-                const origProj = state.projetos.find(proj => proj.id == p.projeto_id);
-                const coordinatorName = origProj ? getCoordinatorName(origProj.coordenadoria_id) : '';
-                
-                projHtml += `
-                    <tr>
-                        <td style="font-weight: 600;">${p.projeto_nome}</td>
-                        <td>
-                            <span class="project-coord-badge">${p.coordenadoria_sigla || 'N/A'}</span>
-                            ${coordinatorName ? `
-                            <div style="font-size: 10px; color: var(--text-muted); margin-top: 3px;">
-                                <i class="fa-solid fa-circle-user" style="font-size: 9px; margin-right: 2px;"></i> ${coordinatorName}
-                            </div>` : ''}
-                        </td>
-                        <td>${p.total_tarefas}</td>
-                        <td><span style="color: var(--accent-green); font-weight: 600;">${p.tarefas_concluidas}</span></td>
-                        <td>${estHours}h</td>
-                        <td style="font-weight: 600;">${workedHours}h</td>
-                        <td>${p.colaboradores_alocados} membros</td>
-                    </tr>
-                `;
-            });
-        }
-        document.getElementById('report-projects-body').innerHTML = projHtml;
-
-        // Render Collaborators Summary
-        let colabHtml = '';
-        if (report.colaboradores.length === 0) {
-            colabHtml = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Nenhum colaborador realizou lançamentos neste período.</td></tr>';
-        } else {
-            report.colaboradores.forEach(c => {
-                const workedHours = c.total_horas_trabalhadas ? Math.round(c.total_horas_trabalhadas) : 0;
-                
-                colabHtml += `
-                    <tr onclick="generateCollaboratorPDF(${c.colaborador_id})" style="cursor: pointer;" title="Clique para gerar PDF de apontamentos deste colaborador">
-                        <td style="font-weight: 600; color: var(--primary-hover);">${c.colaborador_nome} <i class="fa-solid fa-file-pdf" style="margin-left: 5px; font-size: 11.5px; opacity: 0.8;"></i></td>
-                        <td><span class="project-coord-badge">${c.coordenadoria_sigla || 'N/A'}</span></td>
-                        <td>${c.total_projetos} projetos</td>
-                        <td>${c.total_tarefas}</td>
-                        <td><span style="color: var(--accent-green); font-weight: 600;">${c.tarefas_concluidas}</span></td>
-                        <td style="font-weight: 600;">${workedHours}h</td>
-                    </tr>
-                `;
-            });
-        }
-        document.getElementById('report-collaborators-body').innerHTML = colabHtml;
+        state.currentReport = report;
+        renderReportTables();
     } catch (err) {
         console.error('Error generating report:', err);
     }
+}
+
+function renderReportTables() {
+    if (!state.currentReport) return;
+
+    const report = state.currentReport;
+    const gerenciaFilter = document.getElementById('report-gerencia-filter').value;
+    const coordenadoriaFilter = document.getElementById('report-coordenadoria-filter').value;
+
+    // Set period description and vigency dates in header
+    const period = report.period;
+    const startStr = formatDate(period.data_inicio);
+    const endStr = formatDate(period.data_fim);
+    const periodText = `${period.descricao} (${startStr} a ${endStr})`;
+    
+    document.getElementById('project-report-period').textContent = periodText;
+    document.getElementById('collaborator-report-period').textContent = periodText;
+
+    // Filter Projects
+    let filteredProjects = report.projetos;
+    if (gerenciaFilter && gerenciaFilter !== 'all') {
+        filteredProjects = filteredProjects.filter(p => {
+            const origProj = state.projetos.find(proj => proj.id == p.projeto_id);
+            return origProj && origProj.gerencia_id == gerenciaFilter;
+        });
+    }
+    if (coordenadoriaFilter && coordenadoriaFilter !== 'all') {
+        filteredProjects = filteredProjects.filter(p => {
+            const origProj = state.projetos.find(proj => proj.id == p.projeto_id);
+            return origProj && origProj.coordenadoria_id == coordenadoriaFilter;
+        });
+    }
+
+    // Render Projects Summary
+    let projHtml = '';
+    if (filteredProjects.length === 0) {
+        projHtml = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Nenhum projeto encontrado para os filtros selecionados.</td></tr>';
+    } else {
+        filteredProjects.forEach(p => {
+            const estHours = p.total_horas_estimadas ? Math.round(p.total_horas_estimadas) : 0;
+            const workedHours = p.total_horas_trabalhadas ? Math.round(p.total_horas_trabalhadas) : 0;
+            
+            const origProj = state.projetos.find(proj => proj.id == p.projeto_id);
+            const coordinatorName = origProj ? getCoordinatorName(origProj.coordenadoria_id) : '';
+            
+            projHtml += `
+                <tr>
+                    <td style="font-weight: 600;">${p.projeto_nome}</td>
+                    <td>
+                        <span class="project-coord-badge">${p.coordenadoria_sigla || 'N/A'}</span>
+                        ${coordinatorName ? `
+                        <div style="font-size: 10px; color: var(--text-muted); margin-top: 3px;">
+                            <i class="fa-solid fa-circle-user" style="font-size: 9px; margin-right: 2px;"></i> ${coordinatorName}
+                        </div>` : ''}
+                    </td>
+                    <td>${p.total_tarefas}</td>
+                    <td><span style="color: var(--accent-green); font-weight: 600;">${p.tarefas_concluidas}</span></td>
+                    <td>${estHours}h</td>
+                    <td style="font-weight: 600;">${workedHours}h</td>
+                    <td>${p.colaboradores_alocados} membros</td>
+                </tr>
+            `;
+        });
+    }
+    document.getElementById('report-projects-body').innerHTML = projHtml;
+
+    // Filter Collaborators
+    let filteredCollaborators = report.colaboradores;
+    if (gerenciaFilter && gerenciaFilter !== 'all') {
+        filteredCollaborators = filteredCollaborators.filter(c => {
+            const origColab = state.colaboradores.find(col => col.id == c.colaborador_id);
+            return origColab && origColab.gerencia_id == gerenciaFilter;
+        });
+    }
+    if (coordenadoriaFilter && coordenadoriaFilter !== 'all') {
+        filteredCollaborators = filteredCollaborators.filter(c => {
+            const origColab = state.colaboradores.find(col => col.id == c.colaborador_id);
+            return origColab && origColab.coordenadoria_id == coordenadoriaFilter;
+        });
+    }
+
+    // Render Collaborators Summary
+    let colabHtml = '';
+    if (filteredCollaborators.length === 0) {
+        colabHtml = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Nenhum colaborador encontrado para os filtros selecionados.</td></tr>';
+    } else {
+        filteredCollaborators.forEach(c => {
+            const workedHours = c.total_horas_trabalhadas ? Math.round(c.total_horas_trabalhadas) : 0;
+            
+            colabHtml += `
+                <tr onclick="generateCollaboratorPDF(${c.colaborador_id})" style="cursor: pointer;" title="Clique para gerar PDF de apontamentos deste colaborador">
+                    <td style="font-weight: 600; color: var(--primary-hover);">${c.colaborador_nome} <i class="fa-solid fa-file-pdf" style="margin-left: 5px; font-size: 11.5px; opacity: 0.8;"></i></td>
+                    <td><span class="project-coord-badge">${c.coordenadoria_sigla || 'N/A'}</span></td>
+                    <td>${c.total_projetos} projetos</td>
+                    <td>${c.total_tarefas}</td>
+                    <td><span style="color: var(--accent-green); font-weight: 600;">${c.tarefas_concluidas}</span></td>
+                    <td style="font-weight: 600;">${workedHours}h</td>
+                </tr>
+            `;
+        });
+    }
+    document.getElementById('report-collaborators-body').innerHTML = colabHtml;
 }
 
 window.generateCollaboratorPDF = function(collaboratorId) {
