@@ -405,8 +405,8 @@ BEGIN
     INSERT INTO PerfilFuncionalidades (perfil_id, funcionalidade_id)
     SELECT @p_coord, id FROM Funcionalidades WHERE chave IN (N'painel-geral', N'projetos', N'tarefas', N'equipes', N'solicitantes', N'apontamentos');
 
-    -- Apontador gets: painel-geral, apontamentos, tarefas
+    -- Apontador gets: apontamentos, tarefas
     INSERT INTO PerfilFuncionalidades (perfil_id, funcionalidade_id)
-    SELECT @p_apont, id FROM Funcionalidades WHERE chave IN (N'painel-geral', N'apontamentos', N'tarefas');
+    SELECT @p_apont, id FROM Funcionalidades WHERE chave IN (N'apontamentos', N'tarefas');
 END
 GO
