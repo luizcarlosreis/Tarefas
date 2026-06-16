@@ -413,8 +413,10 @@ function setupEventListeners() {
         elements.reportFechamento.addEventListener('change', generateMonthlyReport);
     }
     
-    document.getElementById('btn-generate-report').addEventListener('click', generateMonthlyReport);
-    document.getElementById('btn-print-report').addEventListener('click', () => window.print());
+    const btnPrintColabs = document.getElementById('btn-print-collaborators-report');
+    if (btnPrintColabs) {
+        btnPrintColabs.addEventListener('click', generateAllCollaboratorsPDF);
+    }
 
     const reportGerenciaFilter = document.getElementById('report-gerencia-filter');
     if (reportGerenciaFilter) {
@@ -431,7 +433,10 @@ function setupEventListeners() {
     }
     
     // Closing periods management triggers
-    document.getElementById('btn-manage-fechamentos').addEventListener('click', openManageFechamentosModal);
+    const btnManageFechamentos = document.getElementById('btn-manage-fechamentos');
+    if (btnManageFechamentos) {
+        btnManageFechamentos.addEventListener('click', openManageFechamentosModal);
+    }
     document.getElementById('nav-manage-periods').addEventListener('click', (e) => {
         e.preventDefault();
         openManageFechamentosModal();
@@ -1774,6 +1779,255 @@ function renderReportTables() {
     }
     document.getElementById('report-collaborators-body').innerHTML = colabHtml;
 }
+
+window.generateAllCollaboratorsPDF = function() {
+    const fechamentoId = elements.reportFechamento.value;
+    if (!fechamentoId) return;
+
+    const period = state.mesesFechamento.find(p => p.id == fechamentoId);
+    if (!period) return;
+
+    const gerenciaFilter = document.getElementById('report-gerencia-filter').value;
+    const coordenadoriaFilter = document.getElementById('report-coordenadoria-filter').value;
+
+    let filteredCollaborators = [];
+    if (state.currentReport && state.currentReport.colaboradores) {
+        filteredCollaborators = state.currentReport.colaboradores;
+        if (gerenciaFilter && gerenciaFilter !== 'all') {
+            filteredCollaborators = filteredCollaborators.filter(c => {
+                const origColab = state.colaboradores.find(col => col.id == c.colaborador_id);
+                return origColab && origColab.gerencia_id == gerenciaFilter;
+            });
+        }
+        if (coordenadoriaFilter && coordenadoriaFilter !== 'all') {
+            filteredCollaborators = filteredCollaborators.filter(c => {
+                const origColab = state.colaboradores.find(col => col.id == c.colaborador_id);
+                return origColab && origColab.coordenadoria_id == coordenadoriaFilter;
+            });
+        }
+    }
+
+    if (filteredCollaborators.length === 0) {
+        alert('Nenhum colaborador encontrado para gerar o relatório.');
+        return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        alert('Por favor, permita pop-ups para gerar o PDF.');
+        return;
+    }
+
+    const startStr = formatDate(period.data_inicio);
+    const endStr = formatDate(period.data_fim);
+
+    let htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Fechamento Consolidado de Apontamentos</title>
+            <style>
+                body {
+                    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                    color: #333;
+                    margin: 40px;
+                    font-size: 13px;
+                    line-height: 1.4;
+                }
+                .collaborator-section {
+                    page-break-after: always;
+                }
+                .collaborator-section:last-child {
+                    page-break-after: avoid;
+                }
+                .header {
+                    border-bottom: 2px solid #6d28d9;
+                    padding-bottom: 15px;
+                    margin-bottom: 20px;
+                }
+                .header-title {
+                    font-size: 20px;
+                    font-weight: bold;
+                    color: #111;
+                    margin: 0 0 8px 0;
+                }
+                .meta-grid {
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 10px;
+                    margin-top: 10px;
+                }
+                .meta-item {
+                    font-size: 12.5px;
+                }
+                .meta-label {
+                    font-weight: bold;
+                    color: #555;
+                }
+                .meta-value {
+                    color: #111;
+                }
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-top: 15px;
+                    margin-bottom: 25px;
+                }
+                th, td {
+                    border: 1px solid #ddd;
+                    padding: 8px 10px;
+                    text-align: left;
+                    font-size: 12px;
+                }
+                th {
+                    background-color: #f3f4f6;
+                    font-weight: bold;
+                    color: #374151;
+                }
+                tr:nth-child(even) {
+                    background-color: #fafafa;
+                }
+                .footer {
+                    margin-top: 30px;
+                    border-top: 1px solid #ddd;
+                    padding-top: 15px;
+                    font-size: 11px;
+                    color: #666;
+                    display: flex;
+                    justify-content: space-between;
+                }
+                @media print {
+                    body {
+                        margin: 20px;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+    `;
+
+    filteredCollaborators.forEach(c => {
+        const colab = state.colaboradores.find(col => col.id == c.colaborador_id);
+        if (!colab) return;
+
+        // Filter pointing records for this collaborator and period
+        const colabPointings = state.apontamentos.filter(a => {
+            if (a.colaborador_id != c.colaborador_id) return false;
+            
+            const aDate = typeof a.data_apontamento === 'object' ? a.data_apontamento.toISOString().split('T')[0] : String(a.data_apontamento).split('T')[0];
+            const pStart = typeof period.data_inicio === 'object' ? period.data_inicio.toISOString().split('T')[0] : String(period.data_inicio).split('T')[0];
+            const pEnd = typeof period.data_fim === 'object' ? period.data_fim.toISOString().split('T')[0] : String(period.data_fim).split('T')[0];
+            
+            return aDate >= pStart && aDate <= pEnd;
+        });
+
+        // Sort by date ascending
+        colabPointings.sort((a, b) => {
+            const dateA = typeof a.data_apontamento === 'object' ? a.data_apontamento.toISOString() : String(a.data_apontamento);
+            const dateB = typeof b.data_apontamento === 'object' ? b.data_apontamento.toISOString() : String(b.data_apontamento);
+            return dateA.localeCompare(dateB);
+        });
+
+        const totalHours = colabPointings.reduce((sum, a) => sum + (a.horas ? parseFloat(a.horas) : 0), 0);
+
+        let rowsHtml = '';
+        if (colabPointings.length === 0) {
+            rowsHtml = '<tr><td colspan="8" style="text-align: center; color: #666; padding: 15px;">Nenhum apontamento registrado neste período.</td></tr>';
+        } else {
+            colabPointings.forEach(a => {
+                const dateStr = formatDate(a.data_apontamento);
+                const hoursStr = a.horas !== null && a.horas !== undefined ? `${a.horas}h` : '-';
+                
+                const task = state.tarefas.find(t => t.id == a.tarefa_id);
+                const taskStatus = task ? task.status : 'N/A';
+                const requesterName = task ? (task.solicitante_nome || 'N/A') : 'N/A';
+
+                let statusColor = '#333';
+                if (taskStatus === 'Concluída') statusColor = '#10b981';
+                else if (taskStatus === 'Em Progresso') statusColor = '#3b82f6';
+                else if (taskStatus === 'A Fazer') statusColor = '#6b7280';
+
+                rowsHtml += `
+                    <tr>
+                        <td style="white-space: nowrap;">${dateStr}</td>
+                        <td>${a.projeto_nome || 'N/A'}</td>
+                        <td>${a.tarefa_titulo || 'N/A'}</td>
+                        <td style="color: ${statusColor}; font-weight: 600; white-space: nowrap;">${taskStatus}</td>
+                        <td>${requesterName}</td>
+                        <td>${a.subtarefa_titulo || 'Atividade Geral'}</td>
+                        <td style="text-align: right; font-weight: bold;">${hoursStr}</td>
+                        <td>${a.descricao || ''}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        htmlContent += `
+            <div class="collaborator-section">
+                <div class="header">
+                    <div class="header-title">Relatório Individual de Apontamentos</div>
+                    <div class="meta-grid">
+                        <div class="meta-item">
+                            <span class="meta-label">Colaborador:</span>
+                            <span class="meta-value" style="font-weight: bold;">${colab.nome}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Período:</span>
+                            <span class="meta-value">${period.descricao} (${startStr} a ${endStr})</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Setor:</span>
+                            <span class="meta-value">${colab.coordenadoria_sigla || 'Sem Setor'}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Total de Horas:</span>
+                            <span class="meta-value" style="font-weight: bold; color: #6d28d9;">${totalHours.toFixed(1)}h</span>
+                        </div>
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 80px;">Data</th>
+                            <th style="width: 110px;">Projeto</th>
+                            <th style="width: 120px;">Tarefa</th>
+                            <th style="width: 80px;">Status</th>
+                            <th style="width: 90px;">Solicitante</th>
+                            <th style="width: 90px;">Sub-tarefa</th>
+                            <th style="width: 45px; text-align: right;">Horas</th>
+                            <th>Descrição da Atividade</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+
+                <div class="footer">
+                    <span>Gerado automaticamente pelo sistema de Gestão de Tarefas</span>
+                    <span>Data da geração: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</span>
+                </div>
+            </div>
+        `;
+    });
+
+    htmlContent += `
+            <script>
+                window.onload = function() {
+                    setTimeout(function() {
+                        window.print();
+                    }, 400);
+                }
+            </script>
+        </body>
+        </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+};
 
 window.generateCollaboratorPDF = function(collaboratorId) {
     const fechamentoId = elements.reportFechamento.value;

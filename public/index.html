@@ -410,7 +410,7 @@
                 <section id="closing-tab" class="tab-content">
                     <!-- Date Selector and Report Info -->
                     <div class="report-filters glass">
-                        <div class="filter-inputs">
+                        <div class="filter-inputs" style="width: 100%;">
                             <div class="filter-input-group">
                                 <label for="report-fechamento"><i class="fa-solid fa-calendar-days"></i> Mês de Fechamento:</label>
                                 <select id="report-fechamento">
@@ -429,16 +429,7 @@
                                     <option value="all">Todas as Coordenadorias</option>
                                 </select>
                             </div>
-                            <button class="btn btn-secondary" id="btn-manage-fechamentos" style="margin-left: 5px;">
-                                <i class="fa-solid fa-gear"></i> Gerenciar Períodos
-                            </button>
-                            <button class="btn btn-primary" id="btn-generate-report">
-                                <i class="fa-solid fa-calculator"></i> Gerar Relatório de Fechamento
-                            </button>
                         </div>
-                        <button class="btn btn-secondary" id="btn-print-report">
-                            <i class="fa-solid fa-print"></i> Imprimir/Salvar PDF
-                        </button>
                     </div>
 
                     <!-- Closing Report Output (Print Area) -->
@@ -479,7 +470,12 @@
                                     <h3>Fechamento por Colaborador</h3>
                                     <p class="report-subtitle">Apontamento de horas e tarefas entregues por membro da equipe</p>
                                 </div>
-                                <span class="report-period-badge" id="collaborator-report-period">Junho / 2026</span>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <span class="report-period-badge" id="collaborator-report-period">Junho / 2026</span>
+                                    <button class="btn btn-secondary" id="btn-print-collaborators-report" style="padding: 6px 12px; font-size: 12.5px; height: auto;">
+                                        <i class="fa-solid fa-print"></i> Imprimir Todos (PDF)
+                                    </button>
+                                </div>
                             </div>
                             <div class="table-responsive">
                                 <table class="custom-table report-table">
