@@ -1081,6 +1081,40 @@ app.delete('/api/apontamentos/:id', async (req, res) => {
     }
 });
 
+app.put('/api/apontamentos/:id', async (req, res) => {
+    const { id } = req.params;
+    const { colaborador_id, projeto_id, tarefa_id, subtarefa_id, data_apontamento, horas, descricao } = req.body;
+    try {
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .input('colaborador_id', sql.Int, colaborador_id)
+            .input('projeto_id', sql.Int, projeto_id)
+            .input('tarefa_id', sql.Int, tarefa_id)
+            .input('subtarefa_id', sql.Int, subtarefa_id || null)
+            .input('data_apontamento', sql.Date, data_apontamento)
+            .input('horas', sql.Decimal(5, 2), horas !== null && horas !== undefined && horas !== '' ? horas : null)
+            .input('descricao', sql.NVarChar, descricao)
+            .query(`
+                UPDATE Apontamentos
+                SET colaborador_id = @colaborador_id,
+                    projeto_id = @projeto_id,
+                    tarefa_id = @tarefa_id,
+                    subtarefa_id = @subtarefa_id,
+                    data_apontamento = @data_apontamento,
+                    horas = @horas,
+                    descricao = @descricao
+                OUTPUT INSERTED.*
+                WHERE id = @id
+            `);
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ error: 'Apontamento não encontrado.' });
+        }
+        res.json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // 9. SOLICITANTES (REQUESTERS)
 app.get('/api/solicitantes', async (req, res) => {
     try {

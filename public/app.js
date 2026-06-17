@@ -549,6 +549,7 @@ function setupEventListeners() {
 
     // Apontamento Modal triggers
     document.getElementById('btn-add-apontamento').addEventListener('click', () => {
+        document.getElementById('apontamento-modal-title').textContent = "Registrar Apontamento";
         document.getElementById('apontamento-date').value = new Date().toISOString().split('T')[0];
         document.getElementById('apontamento-id').value = '';
         
@@ -3319,8 +3320,11 @@ function renderApontamentosTab() {
                     <td><span style="color: var(--text-muted);">${a.subtarefa_titulo || 'Atividade Geral'}</span></td>
                     <td style="font-weight: 600; color: var(--accent-blue);">${horasStr}</td>
                     <td style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${a.descricao}">${a.descricao}</td>
-                    <td style="text-align: right;">
-                        <button class="btn btn-danger btn-sm" onclick="deleteApontamento(${a.id})" style="padding: 4px 8px;">
+                    <td style="text-align: right; white-space: nowrap;">
+                        <button class="btn btn-secondary btn-sm" onclick="editApontamento(${a.id})" style="padding: 4px 8px; margin-right: 4px;" title="Editar Apontamento">
+                            <i class="fa-solid fa-pen" style="font-size: 11px;"></i>
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteApontamento(${a.id})" style="padding: 4px 8px;" title="Excluir Apontamento">
                             <i class="fa-solid fa-trash" style="font-size: 11px;"></i>
                         </button>
                     </td>
@@ -3376,6 +3380,7 @@ function renderApontamentosTab() {
 
 async function handleApontamentoSubmit(e) {
     e.preventDefault();
+    const id = document.getElementById('apontamento-id').value;
     const payload = {
         colaborador_id: parseInt(document.getElementById('apontamento-collaborator').value),
         data_apontamento: document.getElementById('apontamento-date').value,
@@ -3387,8 +3392,10 @@ async function handleApontamentoSubmit(e) {
     };
 
     try {
-        const response = await fetch('/api/apontamentos', {
-            method: 'POST',
+        const url = id ? `/api/apontamentos/${id}` : '/api/apontamentos';
+        const method = id ? 'PUT' : 'POST';
+        const response = await fetch(url, {
+            method: method,
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
@@ -3424,6 +3431,102 @@ window.deleteApontamento = async function(id) {
             alert('Erro ao excluir apontamento: ' + err.message);
         }
     }
+};
+
+window.editApontamento = async function(id) {
+    const a = state.apontamentos.find(item => item.id == id);
+    if (!a) return;
+
+    // Set title and ID in modal
+    document.getElementById('apontamento-modal-title').textContent = "Editar Apontamento";
+    document.getElementById('apontamento-id').value = a.id;
+
+    // Populate collaborator and toggle disabled depending on permissions
+    const colabSelect = document.getElementById('apontamento-collaborator');
+    if (colabSelect) {
+        colabSelect.value = a.colaborador_id;
+        const profiles = state.currentUser ? (state.currentUser.profiles || []) : [];
+        const isApontador = profiles.includes('Apontador');
+        const isHigher = profiles.includes('Administrador') || profiles.includes('Gerência') || profiles.includes('Coordenador');
+        if (isApontador && !isHigher) {
+            colabSelect.disabled = true;
+        } else {
+            colabSelect.disabled = false;
+        }
+    }
+
+    // Load project list for this collaborator
+    const colabIdInt = parseInt(a.colaborador_id);
+    const associatedProjectIds = new Set();
+    state.tarefas.forEach(t => {
+        if (t.colaborador_id === colabIdInt) {
+            associatedProjectIds.add(t.projeto_id);
+        }
+        if (t.subtasks && Array.isArray(t.subtasks)) {
+            t.subtasks.forEach(s => {
+                if (s.colaborador_id === colabIdInt) {
+                    associatedProjectIds.add(t.projeto_id);
+                }
+            });
+        }
+    });
+
+    const colabProjects = state.projetos.filter(p => associatedProjectIds.has(p.id));
+    const projectSelect = document.getElementById('apontamento-project');
+    
+    let projHtml = '<option value="" disabled>Escolha o projeto...</option>';
+    colabProjects.forEach(p => {
+        projHtml += `<option value="${p.id}">${p.nome}</option>`;
+    });
+    projectSelect.innerHTML = projHtml;
+    projectSelect.disabled = false;
+    projectSelect.value = a.projeto_id;
+
+    // Load tasks for selected project and collaborator
+    const projectTasks = state.tarefas.filter(t => 
+        t.projeto_id == a.projeto_id && 
+        (t.colaborador_id === colabIdInt || (t.subtasks && t.subtasks.some(s => s.colaborador_id === colabIdInt)))
+    );
+
+    const taskSelect = document.getElementById('apontamento-task');
+    let taskHtml = '<option value="" disabled>Escolha uma tarefa...</option>';
+    projectTasks.forEach(t => {
+        taskHtml += `<option value="${t.id}">${t.titulo}</option>`;
+    });
+    taskSelect.innerHTML = taskHtml;
+    taskSelect.disabled = false;
+    taskSelect.value = a.tarefa_id;
+
+    // Load subtasks for selected task and collaborator
+    const subtaskSelect = document.getElementById('apontamento-subtask');
+    const task = state.tarefas.find(t => t.id == a.tarefa_id);
+    let subtaskHtml = '<option value="">Nenhuma (Opcional)</option>';
+    
+    if (task && task.subtasks && task.subtasks.length > 0) {
+        const filteredSubtasks = task.subtasks.filter(s => 
+            s.colaborador_id === colabIdInt || task.colaborador_id === colabIdInt
+        );
+        filteredSubtasks.forEach(s => {
+            subtaskHtml += `<option value="${s.id}">${s.titulo}</option>`;
+        });
+        subtaskSelect.innerHTML = subtaskHtml;
+        subtaskSelect.disabled = false;
+        subtaskSelect.value = a.subtarefa_id || '';
+    } else {
+        subtaskSelect.innerHTML = '<option value="">Nenhuma sub-tarefa disponível</option>';
+        subtaskSelect.disabled = true;
+        subtaskSelect.value = '';
+    }
+
+    // Populate date, hours and description
+    const rawDate = a.data_apontamento;
+    const dateStr = typeof rawDate === 'object' ? rawDate.toISOString().split('T')[0] : String(rawDate).split('T')[0];
+    document.getElementById('apontamento-date').value = dateStr;
+    document.getElementById('apontamento-hours').value = a.horas !== null && a.horas !== undefined ? a.horas : '';
+    document.getElementById('apontamento-desc').value = a.descricao || '';
+
+    // Show the modal
+    openModal(elements.modalApontamento);
 };
 
 // --- PERIOD MANAGEMENT FUNCTIONS ---
