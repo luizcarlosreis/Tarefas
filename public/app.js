@@ -3495,9 +3495,18 @@ function renderApontamentosTab() {
             const dateA = typeof a.data_apontamento === 'object' ? a.data_apontamento.toISOString() : String(a.data_apontamento);
             const dateB = typeof b.data_apontamento === 'object' ? b.data_apontamento.toISOString() : String(b.data_apontamento);
             if (dateA !== dateB) {
-                return dateB.localeCompare(dateA); // newest first
+                return dateA.localeCompare(dateB); // oldest first (ascending)
             }
-            return b.id - a.id;
+            return a.id - b.id; // oldest ID first
+        });
+    } else {
+        filteredApontamentos.sort((a, b) => {
+            const dateA = typeof a.data_apontamento === 'object' ? a.data_apontamento.toISOString() : String(a.data_apontamento);
+            const dateB = typeof b.data_apontamento === 'object' ? b.data_apontamento.toISOString() : String(b.data_apontamento);
+            if (dateA !== dateB) {
+                return dateA.localeCompare(dateB); // oldest first (ascending)
+            }
+            return a.id - b.id; // oldest ID first
         });
     }
 
