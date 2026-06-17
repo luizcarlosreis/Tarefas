@@ -3312,7 +3312,7 @@ function renderApontamentosTab() {
             const dateStr = formatDate(a.data_apontamento);
             const horasStr = a.horas !== null && a.horas !== undefined ? `${a.horas}h` : '-';
             html += `
-                <tr>
+                <tr ondblclick="editApontamento(${a.id})" style="cursor: pointer;" title="Duplo clique para editar">
                     <td style="color: var(--text-secondary);">${dateStr}</td>
                     <td style="font-weight: 600;">${a.colaborador_nome}</td>
                     <td><span class="project-coord-badge">${a.projeto_nome}</span></td>
