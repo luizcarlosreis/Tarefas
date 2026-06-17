@@ -59,6 +59,10 @@ const elements = {
     reportFechamento: document.getElementById('report-fechamento'),
     apontamentoSearch: document.getElementById('apontamento-search'),
     apontamentoPeriodFilter: document.getElementById('apontamento-period-filter'),
+    apontamentoSuperiorFilters: document.getElementById('apontamento-superior-filters'),
+    apontamentoGerenciaFilter: document.getElementById('apontamento-gerencia-filter'),
+    apontamentoCoordenadoriaFilter: document.getElementById('apontamento-coordenadoria-filter'),
+    apontamentoColaboradorFilter: document.getElementById('apontamento-colaborador-filter'),
     
     // Modals
     modalProject: document.getElementById('modal-project'),
@@ -454,6 +458,21 @@ function setupEventListeners() {
     elements.apontamentoSearch.addEventListener('input', renderApontamentosTab);
     if (elements.apontamentoPeriodFilter) {
         elements.apontamentoPeriodFilter.addEventListener('change', renderApontamentosTab);
+    }
+    if (elements.apontamentoGerenciaFilter) {
+        elements.apontamentoGerenciaFilter.addEventListener('change', () => {
+            updateApontamentoCoordenadoriaDropdown(true);
+            renderApontamentosTab();
+        });
+    }
+    if (elements.apontamentoCoordenadoriaFilter) {
+        elements.apontamentoCoordenadoriaFilter.addEventListener('change', () => {
+            updateApontamentoColaboradorDropdown();
+            renderApontamentosTab();
+        });
+    }
+    if (elements.apontamentoColaboradorFilter) {
+        elements.apontamentoColaboradorFilter.addEventListener('change', renderApontamentosTab);
     }
     if (elements.reportFechamento) {
         elements.reportFechamento.addEventListener('change', generateMonthlyReport);
@@ -1349,6 +1368,155 @@ function populateDropdowns() {
         }
     }
     updateTaskBoardFilters(true, true);
+    populateApontamentoFilters();
+}
+
+function populateApontamentoFilters() {
+    const filterContainer = elements.apontamentoSuperiorFilters;
+    if (!filterContainer) return;
+
+    const currentColab = state.currentUser ? state.colaboradores.find(c => c.id == state.currentUser.id) : null;
+    const perfilIds = currentColab ? (currentColab.perfil_ids || []) : [];
+    const userProfiles = state.perfis.filter(p => perfilIds.includes(p.id)).map(p => p.nome);
+
+    const isHigher = userProfiles.includes('Administrador') || userProfiles.includes('Gerência') || userProfiles.includes('Coordenador');
+
+    if (!isHigher) {
+        filterContainer.style.display = 'none';
+        return;
+    }
+
+    filterContainer.style.display = 'flex';
+
+    const gerSelect = elements.apontamentoGerenciaFilter;
+    const userGerenciaId = currentColab ? currentColab.gerencia_id : null;
+
+    if (gerSelect) {
+        const currentGerId = gerSelect.value;
+        let gerHtml = '';
+        
+        if (userProfiles.includes('Administrador')) {
+            gerHtml = '<option value="all">Todas as Gerências</option>';
+            state.gerencias.forEach(g => {
+                gerHtml += `<option value="${g.id}">${g.sigla} - ${g.nome}</option>`;
+            });
+            gerSelect.innerHTML = gerHtml;
+            gerSelect.disabled = false;
+            if (currentGerId && [...gerSelect.options].some(o => o.value == currentGerId)) {
+                gerSelect.value = currentGerId;
+            } else {
+                gerSelect.value = 'all';
+            }
+        } else if (userProfiles.includes('Gerência') || userProfiles.includes('Coordenador')) {
+            const userGer = state.gerencias.find(g => g.id == userGerenciaId);
+            if (userGer) {
+                gerHtml = `<option value="${userGer.id}">${userGer.sigla} - ${userGer.nome}</option>`;
+            } else {
+                gerHtml = '<option value="" disabled selected>Gerência não encontrada</option>';
+            }
+            gerSelect.innerHTML = gerHtml;
+            gerSelect.disabled = true;
+            gerSelect.value = userGerenciaId || '';
+        }
+    }
+
+    updateApontamentoCoordenadoriaDropdown(true);
+}
+
+function updateApontamentoCoordenadoriaDropdown(updateColabs = true) {
+    const gerSelect = elements.apontamentoGerenciaFilter;
+    const coordSelect = elements.apontamentoCoordenadoriaFilter;
+    if (!gerSelect || !coordSelect) return;
+
+    const selectedGerId = gerSelect.value;
+    const currentColab = state.currentUser ? state.colaboradores.find(c => c.id == state.currentUser.id) : null;
+    const perfilIds = currentColab ? (currentColab.perfil_ids || []) : [];
+    const userProfiles = state.perfis.filter(p => perfilIds.includes(p.id)).map(p => p.nome);
+    const userCoordenadoriaId = currentColab ? currentColab.coordenadoria_id : null;
+
+    const currentCoordId = coordSelect.value;
+
+    let coordHtml = '';
+    if (userProfiles.includes('Administrador')) {
+        coordHtml = '<option value="all">Todas as Coordenadorias</option>';
+        const filteredCoords = selectedGerId === 'all' 
+            ? state.coordenadorias 
+            : state.coordenadorias.filter(c => c.gerencia_id == selectedGerId);
+
+        filteredCoords.forEach(c => {
+            coordHtml += `<option value="${c.id}">${c.sigla} - ${c.nome}</option>`;
+        });
+        coordSelect.innerHTML = coordHtml;
+        coordSelect.disabled = false;
+        
+        if (currentCoordId && [...coordSelect.options].some(o => o.value == currentCoordId)) {
+            coordSelect.value = currentCoordId;
+        } else {
+            coordSelect.value = 'all';
+        }
+    } else if (userProfiles.includes('Gerência')) {
+        coordHtml = '<option value="all">Todas as Coordenadorias</option>';
+        const filteredCoords = state.coordenadorias.filter(c => c.gerencia_id == selectedGerId);
+        filteredCoords.forEach(c => {
+            coordHtml += `<option value="${c.id}">${c.sigla} - ${c.nome}</option>`;
+        });
+        coordSelect.innerHTML = coordHtml;
+        coordSelect.disabled = false;
+        
+        if (currentCoordId && [...coordSelect.options].some(o => o.value == currentCoordId)) {
+            coordSelect.value = currentCoordId;
+        } else {
+            coordSelect.value = 'all';
+        }
+    } else if (userProfiles.includes('Coordenador')) {
+        const userCoord = state.coordenadorias.find(c => c.id == userCoordenadoriaId);
+        if (userCoord) {
+            coordHtml = `<option value="${userCoord.id}">${userCoord.sigla} - ${userCoord.nome}</option>`;
+        } else {
+            coordHtml = '<option value="" disabled selected>Coordenadoria não encontrada</option>';
+        }
+        coordSelect.innerHTML = coordHtml;
+        coordSelect.disabled = true;
+        coordSelect.value = userCoordenadoriaId || '';
+    }
+
+    if (updateColabs) {
+        updateApontamentoColaboradorDropdown();
+    }
+}
+
+function updateApontamentoColaboradorDropdown() {
+    const gerSelect = elements.apontamentoGerenciaFilter;
+    const coordSelect = elements.apontamentoCoordenadoriaFilter;
+    const colabSelect = elements.apontamentoColaboradorFilter;
+    if (!gerSelect || !coordSelect || !colabSelect) return;
+
+    const selectedGerId = gerSelect.value;
+    const selectedCoordId = coordSelect.value;
+    const currentColabId = colabSelect.value;
+
+    let colabHtml = '<option value="all">Todos os Colaboradores</option>';
+    let filteredColabs = state.colaboradores;
+
+    if (selectedGerId && selectedGerId !== 'all') {
+        filteredColabs = filteredColabs.filter(c => c.gerencia_id == selectedGerId);
+    }
+
+    if (selectedCoordId && selectedCoordId !== 'all') {
+        filteredColabs = filteredColabs.filter(c => c.coordenadoria_id == selectedCoordId);
+    }
+
+    filteredColabs.forEach(c => {
+        colabHtml += `<option value="${c.id}">${c.nome}</option>`;
+    });
+    
+    colabSelect.innerHTML = colabHtml;
+    
+    if (currentColabId && [...colabSelect.options].some(o => o.value == currentColabId)) {
+        colabSelect.value = currentColabId;
+    } else {
+        colabSelect.value = 'all';
+    }
 }
 
 async function updateDashboardKPIs() {
@@ -3271,6 +3439,26 @@ function renderApontamentosTab() {
     
     if (isApontador && !isHigher) {
         list = list.filter(a => a.colaborador_id == state.currentUser.id);
+    } else if (isHigher) {
+        const selectedGerId = elements.apontamentoGerenciaFilter ? elements.apontamentoGerenciaFilter.value : 'all';
+        const selectedCoordId = elements.apontamentoCoordenadoriaFilter ? elements.apontamentoCoordenadoriaFilter.value : 'all';
+        const selectedColabId = elements.apontamentoColaboradorFilter ? elements.apontamentoColaboradorFilter.value : 'all';
+
+        list = list.filter(a => {
+            const colab = state.colaboradores.find(c => c.id == a.colaborador_id);
+            if (!colab) return false;
+
+            if (selectedGerId && selectedGerId !== 'all' && colab.gerencia_id != selectedGerId) {
+                return false;
+            }
+            if (selectedCoordId && selectedCoordId !== 'all' && colab.coordenadoria_id != selectedCoordId) {
+                return false;
+            }
+            if (selectedColabId && selectedColabId !== 'all' && a.colaborador_id != selectedColabId) {
+                return false;
+            }
+            return true;
+        });
     }
 
     // Filter by selected period
@@ -3296,6 +3484,22 @@ function renderApontamentosTab() {
         (a.subtarefa_titulo && a.subtarefa_titulo.toLowerCase().includes(searchVal)) ||
         (a.descricao && a.descricao.toLowerCase().includes(searchVal))
     );
+
+    if (isHigher) {
+        filteredApontamentos.sort((a, b) => {
+            const aIsOwn = a.colaborador_id == state.currentUser.id ? 1 : 0;
+            const bIsOwn = b.colaborador_id == state.currentUser.id ? 1 : 0;
+            if (aIsOwn !== bIsOwn) {
+                return bIsOwn - aIsOwn; // own first
+            }
+            const dateA = typeof a.data_apontamento === 'object' ? a.data_apontamento.toISOString() : String(a.data_apontamento);
+            const dateB = typeof b.data_apontamento === 'object' ? b.data_apontamento.toISOString() : String(b.data_apontamento);
+            if (dateA !== dateB) {
+                return dateB.localeCompare(dateA); // newest first
+            }
+            return b.id - a.id;
+        });
+    }
 
     let html = '';
 
