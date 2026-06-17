@@ -14,7 +14,8 @@ let state = {
     terceirizados: [],
     currentUser: null,
     currentTab: 'dashboard-tab',
-    currentReport: null
+    currentReport: null,
+    apontamentoFiltersInitialized: false
 };
 
 let currentProfileLinkedColabs = [];
@@ -1390,6 +1391,7 @@ function populateApontamentoFilters() {
 
     const gerSelect = elements.apontamentoGerenciaFilter;
     const userGerenciaId = currentColab ? currentColab.gerencia_id : null;
+    const isFirstLoad = !state.apontamentoFiltersInitialized;
 
     if (gerSelect) {
         const currentGerId = gerSelect.value;
@@ -1402,7 +1404,10 @@ function populateApontamentoFilters() {
             });
             gerSelect.innerHTML = gerHtml;
             gerSelect.disabled = false;
-            if (currentGerId && [...gerSelect.options].some(o => o.value == currentGerId)) {
+            
+            if (isFirstLoad) {
+                gerSelect.value = userGerenciaId || 'all';
+            } else if (currentGerId && [...gerSelect.options].some(o => o.value == currentGerId)) {
                 gerSelect.value = currentGerId;
             } else {
                 gerSelect.value = 'all';
@@ -1418,12 +1423,18 @@ function populateApontamentoFilters() {
             gerSelect.disabled = true;
             gerSelect.value = userGerenciaId || '';
         }
+
+        // Rule: "caso tenha somente um item na lista, já trazer selecionado" (excluding "all")
+        if (userProfiles.includes('Administrador') && state.gerencias.length === 1) {
+            gerSelect.value = state.gerencias[0].id;
+        }
     }
 
-    updateApontamentoCoordenadoriaDropdown(true);
+    state.apontamentoFiltersInitialized = true;
+    updateApontamentoCoordenadoriaDropdown(true, isFirstLoad);
 }
 
-function updateApontamentoCoordenadoriaDropdown(updateColabs = true) {
+function updateApontamentoCoordenadoriaDropdown(updateColabs = true, isFirstLoad = false) {
     const gerSelect = elements.apontamentoGerenciaFilter;
     const coordSelect = elements.apontamentoCoordenadoriaFilter;
     if (!gerSelect || !coordSelect) return;
@@ -1437,33 +1448,39 @@ function updateApontamentoCoordenadoriaDropdown(updateColabs = true) {
     const currentCoordId = coordSelect.value;
 
     let coordHtml = '';
+    let availableCoords = [];
+
     if (userProfiles.includes('Administrador')) {
         coordHtml = '<option value="all">Todas as Coordenadorias</option>';
-        const filteredCoords = selectedGerId === 'all' 
+        availableCoords = selectedGerId === 'all' 
             ? state.coordenadorias 
             : state.coordenadorias.filter(c => c.gerencia_id == selectedGerId);
 
-        filteredCoords.forEach(c => {
+        availableCoords.forEach(c => {
             coordHtml += `<option value="${c.id}">${c.sigla} - ${c.nome}</option>`;
         });
         coordSelect.innerHTML = coordHtml;
         coordSelect.disabled = false;
         
-        if (currentCoordId && [...coordSelect.options].some(o => o.value == currentCoordId)) {
+        if (isFirstLoad) {
+            coordSelect.value = userCoordenadoriaId || 'all';
+        } else if (currentCoordId && [...coordSelect.options].some(o => o.value == currentCoordId)) {
             coordSelect.value = currentCoordId;
         } else {
             coordSelect.value = 'all';
         }
     } else if (userProfiles.includes('Gerência')) {
         coordHtml = '<option value="all">Todas as Coordenadorias</option>';
-        const filteredCoords = state.coordenadorias.filter(c => c.gerencia_id == selectedGerId);
-        filteredCoords.forEach(c => {
+        availableCoords = state.coordenadorias.filter(c => c.gerencia_id == selectedGerId);
+        availableCoords.forEach(c => {
             coordHtml += `<option value="${c.id}">${c.sigla} - ${c.nome}</option>`;
         });
         coordSelect.innerHTML = coordHtml;
         coordSelect.disabled = false;
         
-        if (currentCoordId && [...coordSelect.options].some(o => o.value == currentCoordId)) {
+        if (isFirstLoad) {
+            coordSelect.value = userCoordenadoriaId || 'all';
+        } else if (currentCoordId && [...coordSelect.options].some(o => o.value == currentCoordId)) {
             coordSelect.value = currentCoordId;
         } else {
             coordSelect.value = 'all';
@@ -1472,6 +1489,7 @@ function updateApontamentoCoordenadoriaDropdown(updateColabs = true) {
         const userCoord = state.coordenadorias.find(c => c.id == userCoordenadoriaId);
         if (userCoord) {
             coordHtml = `<option value="${userCoord.id}">${userCoord.sigla} - ${userCoord.nome}</option>`;
+            availableCoords = [userCoord];
         } else {
             coordHtml = '<option value="" disabled selected>Coordenadoria não encontrada</option>';
         }
@@ -1480,12 +1498,17 @@ function updateApontamentoCoordenadoriaDropdown(updateColabs = true) {
         coordSelect.value = userCoordenadoriaId || '';
     }
 
+    // Rule: "caso tenha somente um item na lista, já trazer selecionado"
+    if (availableCoords.length === 1) {
+        coordSelect.value = availableCoords[0].id;
+    }
+
     if (updateColabs) {
-        updateApontamentoColaboradorDropdown();
+        updateApontamentoColaboradorDropdown(isFirstLoad);
     }
 }
 
-function updateApontamentoColaboradorDropdown() {
+function updateApontamentoColaboradorDropdown(isFirstLoad = false) {
     const gerSelect = elements.apontamentoGerenciaFilter;
     const coordSelect = elements.apontamentoCoordenadoriaFilter;
     const colabSelect = elements.apontamentoColaboradorFilter;
@@ -1512,10 +1535,17 @@ function updateApontamentoColaboradorDropdown() {
     
     colabSelect.innerHTML = colabHtml;
     
-    if (currentColabId && [...colabSelect.options].some(o => o.value == currentColabId)) {
+    if (isFirstLoad && state.currentUser) {
+        colabSelect.value = state.currentUser.id;
+    } else if (currentColabId && [...colabSelect.options].some(o => o.value == currentColabId)) {
         colabSelect.value = currentColabId;
     } else {
         colabSelect.value = 'all';
+    }
+
+    // Rule: "caso tenha somente um item na lista, já trazer selecionado"
+    if (filteredColabs.length === 1) {
+        colabSelect.value = filteredColabs[0].id;
     }
 }
 
@@ -3945,6 +3975,7 @@ async function handleLoginSubmit(e) {
 window.handleLogout = function() {
     localStorage.removeItem('currentUser');
     state.currentUser = null;
+    state.apontamentoFiltersInitialized = false;
     showLoginScreen();
     // Reset page view
     elements.menuItems.forEach(item => item.classList.remove('active'));
