@@ -63,6 +63,32 @@ BEGIN
         senha NVARCHAR(100) NULL
     );
 END
+GO
+
+-- EmpresasParceiras (Partner Companies)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'EmpresasParceiras')
+BEGIN
+    CREATE TABLE EmpresasParceiras (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        nome NVARCHAR(150) NOT NULL,
+        cnpj NVARCHAR(18) NOT NULL UNIQUE
+    );
+END
+
+-- ColaboradoresTerceirizados (Outsourced Collaborators)
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ColaboradoresTerceirizados')
+BEGIN
+    CREATE TABLE ColaboradoresTerceirizados (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        empresa_id INT NOT NULL FOREIGN KEY REFERENCES EmpresasParceiras(id) ON DELETE CASCADE,
+        cpf NVARCHAR(14) NOT NULL,
+        nome NVARCHAR(150) NOT NULL,
+        email NVARCHAR(150) NOT NULL,
+        cargo NVARCHAR(100) NOT NULL
+    );
+END
+GO
+
 
 -- Projetos (Projects)
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'Projetos')
@@ -115,7 +141,8 @@ BEGIN
         tarefa_id INT NOT NULL FOREIGN KEY REFERENCES Tarefas(id) ON DELETE CASCADE,
         titulo NVARCHAR(200) NOT NULL,
         concluida BIT DEFAULT 0,
-        colaborador_id INT FOREIGN KEY REFERENCES Colaboradores(id) ON DELETE SET NULL
+        colaborador_id INT FOREIGN KEY REFERENCES Colaboradores(id) ON DELETE SET NULL,
+        colaborador_terceirizado_id INT FOREIGN KEY REFERENCES ColaboradoresTerceirizados(id) ON DELETE SET NULL
     );
 END
 
@@ -141,7 +168,8 @@ BEGIN
         id INT IDENTITY(1,1) PRIMARY KEY,
         descricao NVARCHAR(200) NOT NULL,
         data_inicio DATE NOT NULL,
-        data_fim DATE NOT NULL
+        data_fim DATE NOT NULL,
+        ativo BIT NOT NULL DEFAULT 0
     );
 END
 
@@ -181,9 +209,9 @@ BEGIN
         perfil_id INT NOT NULL FOREIGN KEY REFERENCES Perfis(id) ON DELETE CASCADE,
         funcionalidade_id INT NOT NULL FOREIGN KEY REFERENCES Funcionalidades(id) ON DELETE CASCADE,
         PRIMARY KEY (perfil_id, funcionalidade_id)
-    );
 END
 GO
+
 
 -- Add circular relationship foreign key for Coordenadorias <-> Colaboradores
 IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_Coordenadorias_Colaboradores')
@@ -353,7 +381,8 @@ BEGIN
     (N'Fechamento Mensal', N'fechamento-mensal'),
     (N'Gerenciar Períodos', N'gerenciar-periodos'),
     (N'Apontamentos', N'apontamentos'),
-    (N'Funcionalidades', N'funcionalidades');
+    (N'Funcionalidades', N'funcionalidades'),
+    (N'Empresas Parceiras', N'empresas');
 END
 GO
 
@@ -410,3 +439,21 @@ BEGIN
     SELECT @p_apont, id FROM Funcionalidades WHERE chave IN (N'apontamentos', N'tarefas');
 END
 GO
+
+-- Seed EmpresasParceiras and ColaboradoresTerceirizados
+IF NOT EXISTS (SELECT * FROM EmpresasParceiras)
+BEGIN
+    INSERT INTO EmpresasParceiras (nome, cnpj) VALUES 
+    (N'Tech Solutions Ltda', N'12.345.678/0001-90'),
+    (N'Global Outsourcing S.A.', N'98.765.432/0001-10');
+
+    DECLARE @tech_id INT = (SELECT id FROM EmpresasParceiras WHERE nome = N'Tech Solutions Ltda');
+    DECLARE @global_id INT = (SELECT id FROM EmpresasParceiras WHERE nome = N'Global Outsourcing S.A.');
+
+    INSERT INTO ColaboradoresTerceirizados (empresa_id, cpf, nome, email, cargo) VALUES
+    (@tech_id, N'111.222.333-44', N'Lucas Oliveira', N'lucas.oliveira@techsolutions.com', N'Desenvolvedor Frontend Terceirizado'),
+    (@tech_id, N'222.333.444-55', N'Mariana Santos', N'mariana.santos@techsolutions.com', N'QA Engineer Terceirizado'),
+    (@global_id, N'333.444.555-66', N'Rodrigo Lima', N'rodrigo.lima@globalout.com', N'Analista de Suporte Terceirizado');
+END
+GO
+

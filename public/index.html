@@ -36,6 +36,9 @@
                 <a href="#" class="menu-item" data-tab="requesters-tab" id="nav-requesters">
                     <i class="fa-solid fa-user-tie"></i> Solicitantes
                 </a>
+                <a href="#" class="menu-item" data-tab="partners-tab" id="nav-partners">
+                    <i class="fa-solid fa-handshake"></i> Empresas Parceiras
+                </a>
                 <a href="#" class="menu-item" data-tab="profiles-tab" id="nav-profiles">
                     <i class="fa-solid fa-id-card-clip"></i> Perfis
                 </a>
@@ -376,6 +379,75 @@
                                     <!-- Dynamic content -->
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 4.75 PARTNERS TAB -->
+                <section id="partners-tab" class="tab-content">
+                    <div class="partners-layout">
+                        <!-- Left Column: Companies List -->
+                        <div class="partners-list-column panel glass">
+                            <div class="panel-header">
+                                <h3>Empresas Parceiras</h3>
+                                <button class="btn btn-secondary btn-sm" id="btn-add-partner">
+                                    <i class="fa-solid fa-plus"></i> Nova Empresa
+                                </button>
+                            </div>
+                            <div class="companies-list-container" id="companies-list">
+                                <!-- Dynamic company cards will be injected here -->
+                            </div>
+                        </div>
+
+                        <!-- Right Column: Detail / Terceirizados CRUD -->
+                        <div class="partner-detail-column panel glass" id="partner-detail-container">
+                            <!-- Selected Company Detail / Terceirizados table -->
+                            <div id="partner-detail-empty" class="detail-empty-state">
+                                <i class="fa-solid fa-handshake empty-state-icon"></i>
+                                <h4>Nenhuma empresa selecionada</h4>
+                                <p>Selecione uma empresa parceira ao lado para gerenciar suas informações e colaboradores terceirizados.</p>
+                            </div>
+                            <div id="partner-detail-content" style="display: none;">
+                                <div class="partner-detail-header">
+                                    <div class="partner-detail-info">
+                                        <h2 id="detail-partner-name">Nome da Empresa</h2>
+                                        <p><i class="fa-solid fa-address-card"></i> CNPJ: <span id="detail-partner-cnpj">00.000.000/0000-00</span></p>
+                                    </div>
+                                    <div class="partner-detail-actions">
+                                        <button class="btn btn-secondary btn-sm" id="btn-edit-partner">
+                                            <i class="fa-solid fa-pen"></i> Editar
+                                        </button>
+                                        <button class="btn btn-danger btn-sm" id="btn-delete-partner">
+                                            <i class="fa-solid fa-trash"></i> Excluir
+                                        </button>
+                                    </div>
+                                </div>
+                                <hr class="panel-divider" style="margin: 20px 0; border: none; border-top: 1px solid var(--border-color);">
+                                <div class="terceirizados-section">
+                                    <div class="panel-header" style="padding: 0 0 15px 0;">
+                                        <h3>Colaboradores Terceirizados</h3>
+                                        <button class="btn btn-primary btn-sm" id="btn-add-terceirizado">
+                                            <i class="fa-solid fa-user-plus"></i> Novo Terceirizado
+                                        </button>
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="custom-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Nome</th>
+                                                    <th>CPF</th>
+                                                    <th>E-mail</th>
+                                                    <th>Cargo</th>
+                                                    <th style="width: 120px; text-align: right;">Ações</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="terceirizados-list">
+                                                <!-- Dynamic outsourced collaborators will be injected here -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -954,10 +1026,21 @@
                     </ul>
                     <div class="add-subtask-form">
                         <input type="text" id="new-subtask-title" placeholder="Nova sub-tarefa...">
-                        <select id="new-subtask-assignee" class="new-subtask-colab-select">
-                            <option value="">Sem Colaborador</option>
-                        </select>
-                        <button type="button" class="btn btn-secondary btn-sm" id="btn-add-subtask-action"><i class="fa-solid fa-plus"></i></button>
+                        <div class="add-subtask-row">
+                            <select id="new-subtask-colab-type" class="subtask-row-select">
+                                <option value="Prodesp">Prodesp</option>
+                                <option value="Terceira">Empresa Terceira</option>
+                            </select>
+                            <select id="new-subtask-company" class="subtask-row-select" style="display: none;">
+                                <option value="">Selecione...</option>
+                            </select>
+                        </div>
+                        <div class="add-subtask-row">
+                            <select id="new-subtask-assignee" class="subtask-row-select">
+                                <option value="">Sem Colaborador</option>
+                            </select>
+                            <button type="button" class="btn btn-secondary btn-sm" id="btn-add-subtask-action"><i class="fa-solid fa-plus"></i></button>
+                        </div>
                     </div>
                 </div>
 
@@ -1049,6 +1132,7 @@
                     <table class="custom-table" style="margin-bottom: 0;">
                         <thead>
                             <tr>
+                                <th style="width: 70px; text-align: center;">Ativo</th>
                                 <th>Descrição</th>
                                 <th>Início</th>
                                 <th>Fim</th>
@@ -1111,6 +1195,65 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="btn-cancel-functionality">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 8.5 PARTNER COMPANY MODAL -->
+    <div class="modal-backdrop" id="modal-partner">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h3 id="partner-modal-title">Registrar Empresa Parceira</h3>
+                <button class="modal-close" id="btn-close-partner-modal">&times;</button>
+            </div>
+            <form id="form-partner">
+                <input type="hidden" id="partner-id">
+                <div class="form-group">
+                    <label for="partner-name">Nome da Empresa *</label>
+                    <input type="text" id="partner-name" required placeholder="Ex: Tech Solutions Ltda">
+                </div>
+                <div class="form-group">
+                    <label for="partner-cnpj">CNPJ *</label>
+                    <input type="text" id="partner-cnpj" required placeholder="Ex: 00.000.000/0000-00" maxlength="18">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-partner">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 8.6 OUTSOURCED COLLABORATOR MODAL -->
+    <div class="modal-backdrop" id="modal-outsourced">
+        <div class="modal-content glass">
+            <div class="modal-header">
+                <h3 id="outsourced-modal-title">Registrar Colaborador Terceirizado</h3>
+                <button class="modal-close" id="btn-close-outsourced-modal">&times;</button>
+            </div>
+            <form id="form-outsourced">
+                <input type="hidden" id="outsourced-id">
+                <input type="hidden" id="outsourced-partner-id">
+                <div class="form-group">
+                    <label for="outsourced-name">Nome Completo *</label>
+                    <input type="text" id="outsourced-name" required placeholder="Ex: Lucas Oliveira">
+                </div>
+                <div class="form-group">
+                    <label for="outsourced-cpf">CPF *</label>
+                    <input type="text" id="outsourced-cpf" required placeholder="Ex: 000.000.000-00" maxlength="14">
+                </div>
+                <div class="form-group">
+                    <label for="outsourced-email">E-mail *</label>
+                    <input type="email" id="outsourced-email" required placeholder="Ex: lucas.oliveira@techsolutions.com">
+                </div>
+                <div class="form-group">
+                    <label for="outsourced-cargo">Cargo *</label>
+                    <input type="text" id="outsourced-cargo" required placeholder="Ex: Desenvolvedor Frontend">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-outsourced">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Salvar</button>
                 </div>
             </form>

@@ -9,6 +9,9 @@ let state = {
     solicitantes: [],
     perfis: [],
     funcionalidades: [],
+    empresas: [],
+    selectedEmpresaId: null,
+    terceirizados: [],
     currentUser: null,
     currentTab: 'dashboard-tab',
     currentReport: null
@@ -128,19 +131,58 @@ async function initApp() {
     // Fetch initial backend data
     await loadBaseData();
     
-    // Select the first period by default if available
+    // Select the active period by default if available
     if (state.mesesFechamento && state.mesesFechamento.length > 0) {
-        elements.reportFechamento.value = state.mesesFechamento[0].id;
+        const activePeriod = state.mesesFechamento.find(f => f.ativo);
+        elements.reportFechamento.value = activePeriod ? activePeriod.id : state.mesesFechamento[0].id;
     }
     
     updateLoggedInUserUI();
     applySecurityPermissions();
-    renderCurrentTab();
+    
+    // Choose initial tab: Apontador profile defaults to pointing screen (apontamentos-tab)
+    const profiles = state.currentUser ? (state.currentUser.profiles || []) : [];
+    const isApontador = profiles.includes('Apontador');
+    const isHigher = profiles.includes('Administrador') || profiles.includes('Gerência') || profiles.includes('Coordenador');
+    
+    let initialTab = 'dashboard-tab';
+    if (isApontador && !isHigher) {
+        initialTab = 'apontamentos-tab';
+    } else {
+        const allowed = state.currentUser ? (state.currentUser.functionalities || []) : [];
+        if (!allowed.includes('painel-geral')) {
+            if (allowed.includes('apontamentos')) {
+                initialTab = 'apontamentos-tab';
+            } else if (allowed.includes('tarefas')) {
+                initialTab = 'tasks-tab';
+            } else {
+                const tabPermissions = {
+                    'projects-tab': 'projetos',
+                    'tasks-tab': 'tarefas',
+                    'team-tab': 'equipes',
+                    'requesters-tab': 'solicitantes',
+                    'profiles-tab': 'perfis',
+                    'functionalities-tab': 'funcionalidades',
+                    'closing-tab': 'fechamento-mensal',
+                    'apontamentos-tab': 'apontamentos',
+                    'partners-tab': 'empresas'
+                };
+                for (const [tId, perm] of Object.entries(tabPermissions)) {
+                    if (allowed.includes(perm)) {
+                        initialTab = tId;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    
+    switchTab(initialTab);
 }
 
 async function loadBaseData() {
     try {
-        const [resCoord, resColab, resProj, resTasks, resGerencias, resApont, resFechamentos, resSolicitantes, resPerfis, resFuncionalidades] = await Promise.all([
+        const [resCoord, resColab, resProj, resTasks, resGerencias, resApont, resFechamentos, resSolicitantes, resPerfis, resFuncionalidades, resEmpresas, resTerceirizados] = await Promise.all([
             fetch('/api/coordenadorias').then(r => r.json()),
             fetch('/api/colaboradores').then(r => r.json()),
             fetch('/api/projetos').then(r => r.json()),
@@ -150,7 +192,9 @@ async function loadBaseData() {
             fetch('/api/meses-fechamento').then(r => r.json()),
             fetch('/api/solicitantes').then(r => r.json()),
             fetch('/api/perfis').then(r => r.json()),
-            fetch('/api/funcionalidades').then(r => r.json())
+            fetch('/api/funcionalidades').then(r => r.json()),
+            fetch('/api/empresas').then(r => r.json()),
+            fetch('/api/terceirizados').then(r => r.json())
         ]);
 
         state.coordenadorias = resCoord;
@@ -163,6 +207,8 @@ async function loadBaseData() {
         state.solicitantes = resSolicitantes;
         state.perfis = resPerfis;
         state.funcionalidades = resFuncionalidades;
+        state.empresas = resEmpresas;
+        state.terceirizados = resTerceirizados;
 
         // Update filters and dropdowns
         populateDropdowns();
@@ -722,6 +768,64 @@ function setupEventListeners() {
             updateTaskCoordinatorDisplay(e.target.value);
         });
     }
+
+    // --- PARTNERS TAB EVENT LISTENERS ---
+
+    const btnAddPartner = document.getElementById('btn-add-partner');
+    if (btnAddPartner) btnAddPartner.addEventListener('click', () => openPartnerModal());
+
+    const btnEditPartner = document.getElementById('btn-edit-partner');
+    if (btnEditPartner) btnEditPartner.addEventListener('click', () => {
+        const company = state.empresas.find(e => e.id == state.selectedEmpresaId);
+        if (company) openPartnerModal(company);
+    });
+
+    const btnDeletePartner = document.getElementById('btn-delete-partner');
+    if (btnDeletePartner) btnDeletePartner.addEventListener('click', deletePartner);
+
+    const btnCancelPartner = document.getElementById('btn-cancel-partner');
+    if (btnCancelPartner) btnCancelPartner.addEventListener('click', () => closeModal(document.getElementById('modal-partner')));
+
+    const btnClosePartnerModal = document.getElementById('btn-close-partner-modal');
+    if (btnClosePartnerModal) btnClosePartnerModal.addEventListener('click', () => closeModal(document.getElementById('modal-partner')));
+
+    const formPartner = document.getElementById('form-partner');
+    if (formPartner) formPartner.addEventListener('submit', handleSavePartner);
+
+    // Outsourced button and modal actions
+    const btnAddTerceirizado = document.getElementById('btn-add-terceirizado');
+    if (btnAddTerceirizado) btnAddTerceirizado.addEventListener('click', () => openOutsourcedModal());
+
+    const btnCancelOutsourced = document.getElementById('btn-cancel-outsourced');
+    if (btnCancelOutsourced) btnCancelOutsourced.addEventListener('click', () => closeModal(document.getElementById('modal-outsourced')));
+
+    const btnCloseOutsourcedModal = document.getElementById('btn-close-outsourced-modal');
+    if (btnCloseOutsourcedModal) btnCloseOutsourcedModal.addEventListener('click', () => closeModal(document.getElementById('modal-outsourced')));
+
+    const formOutsourced = document.getElementById('form-outsourced');
+    if (formOutsourced) formOutsourced.addEventListener('submit', handleSaveOutsourced);
+
+    // Masks for inputs
+    const inputPartnerCnpj = document.getElementById('partner-cnpj');
+    if (inputPartnerCnpj) {
+        inputPartnerCnpj.addEventListener('input', (e) => maskCNPJ(e.target));
+    }
+
+    const inputOutsourcedCpf = document.getElementById('outsourced-cpf');
+    if (inputOutsourcedCpf) {
+        inputOutsourcedCpf.addEventListener('input', (e) => maskCPF(e.target));
+    }
+
+    // Subtask colab type and company filters
+    const subtaskColabTypeSelect = document.getElementById('new-subtask-colab-type');
+    if (subtaskColabTypeSelect) {
+        subtaskColabTypeSelect.addEventListener('change', () => updateNewSubtaskAssigneeOptions());
+    }
+
+    const subtaskCompanySelect = document.getElementById('new-subtask-company');
+    if (subtaskCompanySelect) {
+        subtaskCompanySelect.addEventListener('change', () => updateNewSubtaskAssigneeOptions());
+    }
 }
 
 function switchTab(tabId) {
@@ -733,7 +837,8 @@ function switchTab(tabId) {
         'profiles-tab': 'perfis',
         'functionalities-tab': 'funcionalidades',
         'closing-tab': 'fechamento-mensal',
-        'apontamentos-tab': 'apontamentos'
+        'apontamentos-tab': 'apontamentos',
+        'partners-tab': 'empresas'
     };
     
     if (tabPermissions[tabId]) {
@@ -741,6 +846,24 @@ function switchTab(tabId) {
         const allowed = state.currentUser ? (state.currentUser.functionalities || []) : [];
         if (!allowed || !allowed.includes(requiredPerm)) {
             tabId = 'dashboard-tab';
+        }
+    }
+
+    if (tabId === 'dashboard-tab') {
+        const allowed = state.currentUser ? (state.currentUser.functionalities || []) : [];
+        if (!allowed.includes('painel-geral')) {
+            if (allowed.includes('apontamentos')) {
+                tabId = 'apontamentos-tab';
+            } else if (allowed.includes('tarefas')) {
+                tabId = 'tasks-tab';
+            } else {
+                for (const [tId, perm] of Object.entries(tabPermissions)) {
+                    if (allowed.includes(perm)) {
+                        tabId = tId;
+                        break;
+                    }
+                }
+            }
         }
     }
 
@@ -799,6 +922,10 @@ function switchTab(tabId) {
             elements.pageTitle.textContent = "Funcionalidades";
             elements.pageSubtitle.textContent = "Cadastro e controle de chaves de permissão do sistema";
             break;
+        case 'partners-tab':
+            elements.pageTitle.textContent = "Empresas Parceiras";
+            elements.pageSubtitle.textContent = "Cadastro de empresas parceiras e seus colaboradores terceirizados";
+            break;
     }
 
     renderCurrentTab();
@@ -833,6 +960,9 @@ function renderCurrentTab() {
             break;
         case 'apontamentos-tab':
             renderApontamentosTab();
+            break;
+        case 'partners-tab':
+            renderPartnersTab();
             break;
     }
 }
@@ -1089,14 +1219,7 @@ function populateDropdowns() {
     }
 
     // Subtask collaborator select option
-    const newSubtaskAssigneeSelect = document.getElementById('new-subtask-assignee');
-    if (newSubtaskAssigneeSelect) {
-        let subtaskColabHtml = '<option value="">Sem Colaborador</option>';
-        state.colaboradores.forEach(c => {
-            subtaskColabHtml += `<option value="${c.id}">${c.nome}</option>`;
-        });
-        newSubtaskAssigneeSelect.innerHTML = subtaskColabHtml;
-    }
+    updateNewSubtaskAssigneeOptions();
 
     // Apontamento Collaborators dropdown
     const apontColabSelect = document.getElementById('apontamento-collaborator');
@@ -1146,10 +1269,12 @@ function populateDropdowns() {
             });
         }
         reportFechamentoSelect.innerHTML = fechamentoHtml;
+        const activePeriod = state.mesesFechamento.find(f => f.ativo);
+        const defaultId = activePeriod ? activePeriod.id : (state.mesesFechamento.length > 0 ? state.mesesFechamento[0].id : '');
         if (selectedVal && state.mesesFechamento.some(f => f.id == selectedVal)) {
             reportFechamentoSelect.value = selectedVal;
-        } else if (state.mesesFechamento.length > 0) {
-            reportFechamentoSelect.value = state.mesesFechamento[0].id;
+        } else if (defaultId) {
+            reportFechamentoSelect.value = defaultId;
         }
     }
 
@@ -1186,10 +1311,12 @@ function populateDropdowns() {
             });
         }
         apontamentoPeriodFilterSelect.innerHTML = periodHtml;
+        const activePeriod = state.mesesFechamento.find(f => f.ativo);
+        const defaultId = activePeriod ? activePeriod.id : (state.mesesFechamento.length > 0 ? state.mesesFechamento[0].id : '');
         if (selectedVal && state.mesesFechamento.some(f => f.id == selectedVal)) {
             apontamentoPeriodFilterSelect.value = selectedVal;
-        } else if (state.mesesFechamento.length > 0) {
-            apontamentoPeriodFilterSelect.value = state.mesesFechamento[0].id;
+        } else if (defaultId) {
+            apontamentoPeriodFilterSelect.value = defaultId;
         }
     }
 
@@ -1410,13 +1537,14 @@ function renderTasksTab() {
             t.subtasks.forEach(s => {
                 const checkedAttr = s.concluida ? 'checked' : '';
                 const completedClass = s.concluida ? 'completed' : '';
-                const assigneeName = s.colaborador_nome ? ` (${s.colaborador_nome})` : '';
+                const companyName = s.colaborador_empresa ? ` (${s.colaborador_empresa})` : '';
+                const assigneeName = s.colaborador_nome ? ` (${s.colaborador_nome}${companyName})` : '';
                 subtasksHtml += `
                     <div class="task-card-subtask ${completedClass}">
                         <input type="checkbox" ${checkedAttr} onclick="event.stopPropagation(); toggleSubtask(${s.id}, this.checked)">
                         <span title="${s.titulo}${assigneeName}">
                             ${s.titulo}
-                            ${s.colaborador_nome ? ` <span style="color: var(--text-muted); font-size: 9.5px; font-style: italic; font-weight: normal; margin-left: 2px;">(${s.colaborador_nome})</span>` : ''}
+                            ${s.colaborador_nome ? ` <span style="color: var(--text-muted); font-size: 9.5px; font-style: italic; font-weight: normal; margin-left: 2px;">(${s.colaborador_nome}${companyName})</span>` : ''}
                         </span>
                     </div>
                 `;
@@ -2029,8 +2157,8 @@ window.generateAllCollaboratorsPDF = function() {
     printWindow.document.close();
 };
 
-window.generateCollaboratorPDF = function(collaboratorId) {
-    const fechamentoId = elements.reportFechamento.value;
+window.generateCollaboratorPDF = function(collaboratorId, customPeriodId = null) {
+    const fechamentoId = customPeriodId || elements.reportFechamento.value;
     if (!fechamentoId) return;
 
     const period = state.mesesFechamento.find(p => p.id == fechamentoId);
@@ -2527,10 +2655,14 @@ window.openEditTaskModal = async function(taskId) {
     }
 
     // Set default assignee for new subtasks to the task's assignee
-    const subtaskAssigneeSelect = document.getElementById('new-subtask-assignee');
-    if (subtaskAssigneeSelect) {
-        subtaskAssigneeSelect.value = task.colaborador_id || '';
+    const typeSelect = document.getElementById('new-subtask-colab-type');
+    const companySelect = document.getElementById('new-subtask-company');
+    if (typeSelect) typeSelect.value = 'Prodesp';
+    if (companySelect) {
+        companySelect.value = '';
+        companySelect.style.display = 'none';
     }
+    updateNewSubtaskAssigneeOptions(task.colaborador_id ? `prodesp-${task.colaborador_id}` : '');
 
     // Load subtasks list
     await loadAndRenderSubtasks(task.id);
@@ -2554,8 +2686,21 @@ async function loadAndRenderSubtasks(taskId) {
                 
                 // Build options for collaborators list
                 let optionsHtml = '<option value="">Sem Colaborador</option>';
+                optionsHtml += '<optgroup label="Prodesp">';
                 state.colaboradores.forEach(c => {
-                    optionsHtml += `<option value="${c.id}" ${c.id === s.colaborador_id ? 'selected' : ''}>${c.nome}</option>`;
+                    optionsHtml += `<option value="prodesp-${c.id}" ${c.id === s.colaborador_id ? 'selected' : ''}>${c.nome} (Prodesp)</option>`;
+                });
+                optionsHtml += '</optgroup>';
+
+                state.empresas.forEach(emp => {
+                    const compTercs = state.terceirizados.filter(t => t.empresa_id === emp.id);
+                    if (compTercs.length > 0) {
+                        optionsHtml += `<optgroup label="${emp.nome}">`;
+                        compTercs.forEach(t => {
+                            optionsHtml += `<option value="terceiro-${t.id}" ${t.id === s.colaborador_terceirizado_id ? 'selected' : ''}>${t.nome} (${t.cargo}) (${emp.nome})</option>`;
+                        });
+                        optionsHtml += '</optgroup>';
+                    }
                 });
 
                 item.innerHTML = `
@@ -2612,13 +2757,24 @@ window.updateSubtaskCollaborator = async function(subtaskId, collaboratorId) {
         const sub = subtasks.find(s => s.id === subtaskId);
         if (!sub) return;
 
+        let colabId = null;
+        let colabTercId = null;
+        if (collaboratorId) {
+            if (collaboratorId.startsWith('prodesp-')) {
+                colabId = parseInt(collaboratorId.replace('prodesp-', ''));
+            } else if (collaboratorId.startsWith('terceiro-')) {
+                colabTercId = parseInt(collaboratorId.replace('terceiro-', ''));
+            }
+        }
+
         await fetch(`/api/subtarefas/detalhes/${subtaskId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 titulo: sub.titulo,
                 concluida: sub.concluida,
-                colaborador_id: collaboratorId ? parseInt(collaboratorId) : null
+                colaborador_id: colabId,
+                colaborador_terceirizado_id: colabTercId
             })
         });
         
@@ -2644,7 +2800,16 @@ document.getElementById('btn-add-subtask-action').addEventListener('click', asyn
         if (!title) return;
 
         const assigneeSelect = document.getElementById('new-subtask-assignee');
-        const colaborador_id = assigneeSelect && assigneeSelect.value ? parseInt(assigneeSelect.value) : null;
+        let colabId = null;
+        let colabTercId = null;
+        if (assigneeSelect && assigneeSelect.value) {
+            const val = assigneeSelect.value;
+            if (val.startsWith('prodesp-')) {
+                colabId = parseInt(val.replace('prodesp-', ''));
+            } else if (val.startsWith('terceiro-')) {
+                colabTercId = parseInt(val.replace('terceiro-', ''));
+            }
+        }
 
         const response = await fetch('/api/subtarefas', {
             method: 'POST',
@@ -2653,7 +2818,8 @@ document.getElementById('btn-add-subtask-action').addEventListener('click', asyn
                 tarefa_id: taskId,
                 titulo: title,
                 concluida: false,
-                colaborador_id
+                colaborador_id: colabId,
+                colaborador_terceirizado_id: colabTercId
             })
         });
 
@@ -2990,15 +3156,20 @@ async function handleDeleteTaskAction() {
 
     if (confirm('Deseja realmente excluir esta tarefa? Todas as sub-tarefas associadas também serão excluídas permanentemente.')) {
         try {
-            await fetch(`/api/tarefas/${taskId}`, {
+            const response = await fetch(`/api/tarefas/${taskId}`, {
                 method: 'DELETE'
             });
+            if (!response.ok) {
+                const errData = await response.json();
+                alert(errData.error || 'Erro ao tentar excluir a tarefa.');
+                return;
+            }
             closeModal(elements.modalEditTaskStatus);
             await loadBaseData();
             renderCurrentTab();
         } catch (err) {
             console.error('Error deleting task:', err);
-            alert('Erro ao tentar excluir a tarefa.');
+            alert('Erro de conexão ao tentar excluir a tarefa.');
         }
     }
 }
@@ -3068,13 +3239,19 @@ window.editSubtask = async function(subtaskId) {
 window.deleteSubtask = async function(subtaskId) {
     if (confirm("Deseja realmente excluir esta sub-tarefa?")) {
         try {
-            await fetch(`/api/subtarefas/${subtaskId}`, {
+            const response = await fetch(`/api/subtarefas/${subtaskId}`, {
                 method: 'DELETE'
             });
+            if (!response.ok) {
+                const errData = await response.json();
+                alert(errData.error || 'Erro ao tentar excluir a sub-tarefa.');
+                return;
+            }
             const taskId = parseInt(document.getElementById('edit-task-id').value);
             await loadAndRenderSubtasks(taskId);
         } catch (err) {
             console.error('Error deleting subtask:', err);
+            alert('Erro de conexão ao tentar excluir a sub-tarefa.');
         }
     }
 };
@@ -3162,7 +3339,7 @@ function renderApontamentosTab() {
         if (!colabTotals[id]) {
             const colabObj = state.colaboradores.find(c => c.id == id);
             const sector = colabObj ? (colabObj.coordenadoria_sigla || 'Sem Setor') : 'N/A';
-            colabTotals[id] = { name, sector, hours: 0 };
+            colabTotals[id] = { id, name, sector, hours: 0 };
         }
         colabTotals[id].hours += hours;
     });
@@ -3183,8 +3360,8 @@ function renderApontamentosTab() {
     } else {
         sortedColabs.forEach(item => {
             totalsHtml += `
-                <tr>
-                    <td style="font-weight: 600;">${item.name}</td>
+                <tr onclick="generateCollaboratorPDF(${item.id}, '${periodId || ''}')" style="cursor: pointer;" title="Clique para gerar PDF de apontamentos deste colaborador">
+                    <td style="font-weight: 600; color: var(--primary-hover);">${item.name} <i class="fa-solid fa-file-pdf" style="margin-left: 5px; font-size: 11.5px; opacity: 0.8;"></i></td>
                     <td><span class="project-coord-badge">${item.sector}</span></td>
                     <td style="font-weight: 600; color: var(--accent-blue);">${item.hours.toFixed(1)}h</td>
                 </tr>
@@ -3260,13 +3437,16 @@ function renderFechamentosModalList() {
     listEl.innerHTML = '';
 
     if (state.mesesFechamento.length === 0) {
-        listEl.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Nenhum período cadastrado.</td></tr>';
+        listEl.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">Nenhum período cadastrado.</td></tr>';
     } else {
         state.mesesFechamento.forEach(f => {
             const row = document.createElement('tr');
             const startStr = formatDate(f.data_inicio);
             const endStr = formatDate(f.data_fim);
             row.innerHTML = `
+                <td style="text-align: center;">
+                    <input type="checkbox" ${f.ativo ? 'checked' : ''} onchange="toggleAtivoFechamento(${f.id}, this.checked)" style="cursor: pointer; width: 16px; height: 16px; accent-color: var(--primary);">
+                </td>
                 <td style="font-weight: 600;">${f.descricao}</td>
                 <td>${startStr}</td>
                 <td>${endStr}</td>
@@ -3280,6 +3460,35 @@ function renderFechamentosModalList() {
         });
     }
 }
+
+window.toggleAtivoFechamento = async function(id, isChecked) {
+    if (!isChecked) {
+        renderFechamentosModalList();
+        return;
+    }
+    try {
+        const response = await fetch(`/api/meses-fechamento/${id}/ativar`, {
+            method: 'PUT'
+        });
+        if (!response.ok) throw new Error('Falha ao ativar período.');
+        
+        await loadBaseData();
+        
+        const activePeriod = state.mesesFechamento.find(f => f.ativo);
+        if (activePeriod) {
+            if (elements.reportFechamento) elements.reportFechamento.value = activePeriod.id;
+            if (elements.apontamentoPeriodFilter) elements.apontamentoPeriodFilter.value = activePeriod.id;
+        }
+        
+        renderFechamentosModalList();
+        populateDropdowns();
+        renderCurrentTab();
+    } catch (err) {
+        console.error(err);
+        alert('Erro ao ativar período: ' + err.message);
+        renderFechamentosModalList();
+    }
+};
 
 async function handleFechamentoSubmit(e) {
     e.preventDefault();
@@ -3460,7 +3669,8 @@ function applySecurityPermissions() {
         'nav-functionalities': 'funcionalidades',
         'nav-closing': 'fechamento-mensal',
         'nav-manage-periods': 'gerenciar-periodos',
-        'nav-apontamentos': 'apontamentos'
+        'nav-apontamentos': 'apontamentos',
+        'nav-partners': 'empresas'
     };
     
     // Hide/show menu links
@@ -3629,6 +3839,375 @@ function setupDatePickerListeners() {
             }
         });
     });
+}
+
+// --- PARTNER COMPANIES & OUTSOURCED COLLABORATORS CRUD ---
+
+// Render Tab
+function renderPartnersTab() {
+    renderCompaniesList();
+    renderPartnerDetail();
+}
+
+// Render Left Column: Companies List
+function renderCompaniesList() {
+    const listEl = document.getElementById('companies-list');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+
+    if (state.empresas.length === 0) {
+        listEl.innerHTML = `
+            <div style="text-align: center; color: var(--text-muted); padding: 20px;">
+                Nenhuma empresa cadastrada.
+            </div>
+        `;
+        return;
+    }
+
+    state.empresas.forEach(emp => {
+        const isActive = state.selectedEmpresaId == emp.id ? 'active' : '';
+        const card = document.createElement('div');
+        card.className = `partner-card ${isActive}`;
+        card.innerHTML = `
+            <div class="partner-card-title">${emp.nome}</div>
+            <div class="partner-card-cnpj">CNPJ: ${emp.cnpj}</div>
+            <div class="partner-card-terceirizados-count">
+                <i class="fa-solid fa-users"></i> ${emp.total_terceirizados || 0} Terceirizados
+            </div>
+        `;
+        card.addEventListener('click', () => {
+            state.selectedEmpresaId = emp.id;
+            renderPartnersTab();
+        });
+        listEl.appendChild(card);
+    });
+}
+
+// Render Right Column: Selected Company Detail
+async function renderPartnerDetail() {
+    const emptyEl = document.getElementById('partner-detail-empty');
+    const contentEl = document.getElementById('partner-detail-content');
+    if (!emptyEl || !contentEl) return;
+
+    if (!state.selectedEmpresaId) {
+        emptyEl.style.display = 'flex';
+        contentEl.style.display = 'none';
+        return;
+    }
+
+    const company = state.empresas.find(e => e.id == state.selectedEmpresaId);
+    if (!company) {
+        state.selectedEmpresaId = null;
+        emptyEl.style.display = 'flex';
+        contentEl.style.display = 'none';
+        return;
+    }
+
+    // Populate company header details
+    emptyEl.style.display = 'none';
+    contentEl.style.display = 'block';
+    document.getElementById('detail-partner-name').textContent = company.nome;
+    document.getElementById('detail-partner-cnpj').textContent = company.cnpj;
+
+    // Load outsourced collaborators for this company
+    const listTableEl = document.getElementById('terceirizados-list');
+    if (!listTableEl) return;
+    listTableEl.innerHTML = `
+        <tr>
+            <td colspan="5" style="text-align: center; color: var(--text-muted);">Carregando terceirizados...</td>
+        </tr>
+    `;
+
+    try {
+        const response = await fetch(`/api/empresas/${company.id}/terceirizados`);
+        state.terceirizados = await response.json();
+        
+        listTableEl.innerHTML = '';
+        if (state.terceirizados.length === 0) {
+            listTableEl.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align: center; color: var(--text-muted);">
+                        Nenhum colaborador terceirizado cadastrado para esta empresa.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        state.terceirizados.forEach(t => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${t.nome}</strong></td>
+                <td>${t.cpf}</td>
+                <td>${t.email}</td>
+                <td><span class="badge badge-todo">${t.cargo}</span></td>
+                <td style="text-align: right;">
+                    <div style="display: flex; gap: 6px; justify-content: flex-end;">
+                        <button class="btn btn-secondary btn-sm edit-terc-btn" data-id="${t.id}" title="Editar">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button class="btn btn-danger btn-sm delete-terc-btn" data-id="${t.id}" title="Excluir">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            `;
+
+            // Wire action buttons
+            tr.querySelector('.edit-terc-btn').addEventListener('click', () => openOutsourcedModal(t));
+            tr.querySelector('.delete-terc-btn').addEventListener('click', () => deleteOutsourced(t.id));
+
+            listTableEl.appendChild(tr);
+        });
+    } catch (err) {
+        console.error('Error rendering terceirizados list:', err);
+        listTableEl.innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align: center; color: var(--accent-red);">Erro ao carregar terceirizados.</td>
+            </tr>
+        `;
+    }
+}
+
+// Modal Partner Company Helpers
+function openPartnerModal(company = null) {
+    const modal = document.getElementById('modal-partner');
+    const title = document.getElementById('partner-modal-title');
+    const form = document.getElementById('form-partner');
+    if (!modal || !form) return;
+
+    form.reset();
+    if (company) {
+        title.textContent = 'Editar Empresa Parceira';
+        document.getElementById('partner-id').value = company.id;
+        document.getElementById('partner-name').value = company.nome;
+        document.getElementById('partner-cnpj').value = company.cnpj;
+    } else {
+        title.textContent = 'Registrar Empresa Parceira';
+        document.getElementById('partner-id').value = '';
+    }
+    openModal(modal);
+}
+
+async function handleSavePartner(e) {
+    e.preventDefault();
+    const id = document.getElementById('partner-id').value;
+    const nome = document.getElementById('partner-name').value;
+    const cnpj = document.getElementById('partner-cnpj').value;
+
+    const payload = { nome, cnpj };
+    const url = id ? `/api/empresas/${id}` : '/api/empresas';
+    const method = id ? 'PUT' : 'POST';
+
+    try {
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const errData = await response.json();
+            alert(errData.error || 'Erro ao salvar empresa parceira.');
+            return;
+        }
+
+        closeModal(document.getElementById('modal-partner'));
+        await loadBaseData();
+        if (!id && state.empresas.length > 0) {
+            const newCompany = state.empresas.find(emp => emp.cnpj === cnpj);
+            if (newCompany) state.selectedEmpresaId = newCompany.id;
+        }
+        renderPartnersTab();
+    } catch (err) {
+        console.error('Error saving company:', err);
+    }
+}
+
+async function deletePartner() {
+    if (!state.selectedEmpresaId) return;
+    const company = state.empresas.find(e => e.id == state.selectedEmpresaId);
+    if (!company) return;
+
+    if (!confirm(`Tem certeza de que deseja excluir a empresa "${company.nome}"? Isso excluirá todos os colaboradores terceirizados vinculados a ela.`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/empresas/${company.id}`, { method: 'DELETE' });
+        if (response.ok) {
+            state.selectedEmpresaId = null;
+            await loadBaseData();
+            renderPartnersTab();
+        } else {
+            alert('Erro ao excluir empresa parceira.');
+        }
+    } catch (err) {
+        console.error('Error deleting company:', err);
+    }
+}
+
+// Modal Outsourced Collaborator Helpers
+function openOutsourcedModal(terceirizado = null) {
+    const modal = document.getElementById('modal-outsourced');
+    const title = document.getElementById('outsourced-modal-title');
+    const form = document.getElementById('form-outsourced');
+    if (!modal || !form) return;
+
+    form.reset();
+    document.getElementById('outsourced-partner-id').value = state.selectedEmpresaId;
+    if (terceirizado) {
+        title.textContent = 'Editar Colaborador Terceirizado';
+        document.getElementById('outsourced-id').value = terceirizado.id;
+        document.getElementById('outsourced-name').value = terceirizado.nome;
+        document.getElementById('outsourced-cpf').value = terceirizado.cpf;
+        document.getElementById('outsourced-email').value = terceirizado.email;
+        document.getElementById('outsourced-cargo').value = terceirizado.cargo;
+    } else {
+        title.textContent = 'Registrar Colaborador Terceirizado';
+        document.getElementById('outsourced-id').value = '';
+    }
+    openModal(modal);
+}
+
+async function handleSaveOutsourced(e) {
+    e.preventDefault();
+    const id = document.getElementById('outsourced-id').value;
+    const empresaId = document.getElementById('outsourced-partner-id').value;
+    const nome = document.getElementById('outsourced-name').value;
+    const cpf = document.getElementById('outsourced-cpf').value;
+    const email = document.getElementById('outsourced-email').value;
+    const cargo = document.getElementById('outsourced-cargo').value;
+
+    const payload = { nome, cpf, email, cargo };
+    const url = id ? `/api/terceirizados/${id}` : `/api/empresas/${empresaId}/terceirizados`;
+    const method = id ? 'PUT' : 'POST';
+
+    try {
+        const response = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const errData = await response.json();
+            alert(errData.error || 'Erro ao salvar colaborador terceirizado.');
+            return;
+        }
+
+        closeModal(document.getElementById('modal-outsourced'));
+        await loadBaseData(); 
+        renderPartnersTab();
+    } catch (err) {
+        console.error('Error saving outsourced:', err);
+    }
+}
+
+async function deleteOutsourced(id) {
+    const terceirizado = state.terceirizados.find(t => t.id == id);
+    if (!terceirizado) return;
+
+    if (!confirm(`Tem certeza de que deseja excluir o colaborador terceirizado "${terceirizado.nome}"?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/terceirizados/${id}`, { method: 'DELETE' });
+        if (response.ok) {
+            await loadBaseData(); 
+            renderPartnersTab();
+        } else {
+            alert('Erro ao excluir colaborador terceirizado.');
+        }
+    } catch (err) {
+        console.error('Error deleting outsourced:', err);
+    }
+}
+
+// Input mask functions
+function maskCNPJ(el) {
+    let val = el.value.replace(/\D/g, "");
+    if (val.length > 14) val = val.substring(0, 14);
+    
+    let formatted = val;
+    if (val.length > 2) {
+        formatted = val.substring(0, 2) + "." + val.substring(2);
+    }
+    if (val.length > 5) {
+        formatted = formatted.substring(0, 6) + "." + formatted.substring(6);
+    }
+    if (val.length > 8) {
+        formatted = formatted.substring(0, 10) + "/" + formatted.substring(10);
+    }
+    if (val.length > 12) {
+        formatted = formatted.substring(0, 15) + "-" + formatted.substring(15);
+    }
+    el.value = formatted;
+}
+
+function maskCPF(el) {
+    let val = el.value.replace(/\D/g, "");
+    if (val.length > 11) val = val.substring(0, 11);
+    
+    let formatted = val;
+    if (val.length > 3) {
+        formatted = val.substring(0, 3) + "." + val.substring(3);
+    }
+    if (val.length > 6) {
+        formatted = formatted.substring(0, 7) + "." + formatted.substring(7);
+    }
+    if (val.length > 9) {
+        formatted = formatted.substring(0, 11) + "-" + formatted.substring(11);
+    }
+    el.value = formatted;
+}
+
+// Update assignee options based on colab type and company
+function updateNewSubtaskAssigneeOptions(defaultSelectedVal = '') {
+    const typeSelect = document.getElementById('new-subtask-colab-type');
+    const companySelect = document.getElementById('new-subtask-company');
+    const assigneeSelect = document.getElementById('new-subtask-assignee');
+    if (!typeSelect || !companySelect || !assigneeSelect) return;
+
+    const type = typeSelect.value;
+    let html = '<option value="">Sem Colaborador</option>';
+
+    if (type === 'Prodesp') {
+        companySelect.style.display = 'none';
+        state.colaboradores.forEach(c => {
+            const val = `prodesp-${c.id}`;
+            const isSelected = val === defaultSelectedVal ? 'selected' : '';
+            html += `<option value="${val}" ${isSelected}>${c.nome} (Prodesp)</option>`;
+        });
+    } else {
+        companySelect.style.display = 'inline-block';
+        
+        // Populate companies dropdown if it only has "Selecione..." option
+        if (companySelect.options.length <= 1) {
+            let compHtml = '<option value="">Selecione...</option>';
+            state.empresas.forEach(emp => {
+                compHtml += `<option value="${emp.id}">${emp.nome}</option>`;
+            });
+            companySelect.innerHTML = compHtml;
+        }
+
+        const selectedCompanyId = companySelect.value;
+        if (selectedCompanyId) {
+            const companyObj = state.empresas.find(e => e.id == selectedCompanyId);
+            const companyName = companyObj ? companyObj.nome : '';
+            const filtered = state.terceirizados.filter(t => t.empresa_id == selectedCompanyId);
+            filtered.forEach(t => {
+                const val = `terceiro-${t.id}`;
+                const isSelected = val === defaultSelectedVal ? 'selected' : '';
+                html += `<option value="${val}" ${isSelected}>${t.nome} (${t.cargo}) (${companyName})</option>`;
+            });
+        } else {
+            html += '<option value="" disabled>Escolha uma empresa parceira...</option>';
+        }
+    }
+
+    assigneeSelect.innerHTML = html;
 }
 
 

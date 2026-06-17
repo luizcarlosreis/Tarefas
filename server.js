@@ -61,6 +61,187 @@ async function connectDB(retries = 5, delay = 3000) {
 
 // --- API ENDPOINTS ---
 
+// --- EMPRESAS PARCEIRAS & TERCEIRIZADOS ---
+
+// GET all companies
+app.get('/api/empresas', async (req, res) => {
+    try {
+        const query = `
+            SELECT emp.*, 
+                   (SELECT COUNT(*) FROM ColaboradoresTerceirizados WHERE empresa_id = emp.id) as total_terceirizados
+            FROM EmpresasParceiras emp
+            ORDER BY emp.nome
+        `;
+        const result = await pool.request().query(query);
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST new company
+app.post('/api/empresas', async (req, res) => {
+    const { nome, cnpj } = req.body;
+    if (!nome || !cnpj) {
+        return res.status(400).json({ error: 'Nome e CNPJ são obrigatórios.' });
+    }
+    try {
+        const checkQuery = await pool.request()
+            .input('cnpj', sql.NVarChar, cnpj)
+            .query('SELECT id FROM EmpresasParceiras WHERE cnpj = @cnpj');
+        if (checkQuery.recordset.length > 0) {
+            return res.status(400).json({ error: 'CNPJ já cadastrado para outra empresa.' });
+        }
+
+        const result = await pool.request()
+            .input('nome', sql.NVarChar, nome)
+            .input('cnpj', sql.NVarChar, cnpj)
+            .query('INSERT INTO EmpresasParceiras (nome, cnpj) OUTPUT INSERTED.* VALUES (@nome, @cnpj)');
+        res.status(201).json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// PUT update company
+app.put('/api/empresas/:id', async (req, res) => {
+    const { id } = req.params;
+    const { nome, cnpj } = req.body;
+    if (!nome || !cnpj) {
+        return res.status(400).json({ error: 'Nome e CNPJ são obrigatórios.' });
+    }
+    try {
+        const checkQuery = await pool.request()
+            .input('id', sql.Int, id)
+            .input('cnpj', sql.NVarChar, cnpj)
+            .query('SELECT id FROM EmpresasParceiras WHERE cnpj = @cnpj AND id <> @id');
+        if (checkQuery.recordset.length > 0) {
+            return res.status(400).json({ error: 'CNPJ já cadastrado para outra empresa.' });
+        }
+
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .input('nome', sql.NVarChar, nome)
+            .input('cnpj', sql.NVarChar, cnpj)
+            .query(`
+                UPDATE EmpresasParceiras
+                SET nome = @nome, cnpj = @cnpj
+                OUTPUT INSERTED.*
+                WHERE id = @id
+            `);
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ error: 'Empresa parceira não encontrada.' });
+        }
+        res.json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE company
+app.delete('/api/empresas/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.request()
+            .input('id', sql.Int, id)
+            .query('DELETE FROM EmpresasParceiras WHERE id = @id');
+        res.json({ success: true, message: 'Empresa parceira excluída com sucesso.' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET all terceirizados
+app.get('/api/terceirizados', async (req, res) => {
+    try {
+        const result = await pool.request().query('SELECT * FROM ColaboradoresTerceirizados ORDER BY nome');
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET terceirizados for a specific company
+app.get('/api/empresas/:empresaId/terceirizados', async (req, res) => {
+    const { empresaId } = req.params;
+    try {
+        const result = await pool.request()
+            .input('empresa_id', sql.Int, empresaId)
+            .query('SELECT * FROM ColaboradoresTerceirizados WHERE empresa_id = @empresa_id ORDER BY nome');
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST new terceirizado under a company
+app.post('/api/empresas/:empresaId/terceirizados', async (req, res) => {
+    const { empresaId } = req.params;
+    const { nome, cpf, email, cargo } = req.body;
+    if (!nome || !cpf || !email || !cargo) {
+        return res.status(400).json({ error: 'Todos os campos (nome, cpf, email, cargo) são obrigatórios.' });
+    }
+    try {
+        const result = await pool.request()
+            .input('empresa_id', sql.Int, empresaId)
+            .input('cpf', sql.NVarChar, cpf)
+            .input('nome', sql.NVarChar, nome)
+            .input('email', sql.NVarChar, email)
+            .input('cargo', sql.NVarChar, cargo)
+            .query(`
+                INSERT INTO ColaboradoresTerceirizados (empresa_id, cpf, nome, email, cargo)
+                OUTPUT INSERTED.*
+                VALUES (@empresa_id, @cpf, @nome, @email, @cargo)
+            `);
+        res.status(201).json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// PUT update terceirizado
+app.put('/api/terceirizados/:id', async (req, res) => {
+    const { id } = req.params;
+    const { nome, cpf, email, cargo } = req.body;
+    if (!nome || !cpf || !email || !cargo) {
+        return res.status(400).json({ error: 'Todos os campos (nome, cpf, email, cargo) são obrigatórios.' });
+    }
+    try {
+        const result = await pool.request()
+            .input('id', sql.Int, id)
+            .input('cpf', sql.NVarChar, cpf)
+            .input('nome', sql.NVarChar, nome)
+            .input('email', sql.NVarChar, email)
+            .input('cargo', sql.NVarChar, cargo)
+            .query(`
+                UPDATE ColaboradoresTerceirizados
+                SET cpf = @cpf, nome = @nome, email = @email, cargo = @cargo
+                OUTPUT INSERTED.*
+                WHERE id = @id
+            `);
+        if (result.recordset.length === 0) {
+            return res.status(404).json({ error: 'Colaborador terceirizado não encontrado.' });
+        }
+        res.json(result.recordset[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// DELETE terceirizado
+app.delete('/api/terceirizados/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await pool.request()
+            .input('id', sql.Int, id)
+            .query('DELETE FROM ColaboradoresTerceirizados WHERE id = @id');
+        res.json({ success: true, message: 'Colaborador terceirizado excluído com sucesso.' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+
 // 1. DASHBOARD SUMMARY
 app.get('/api/dashboard/summary', async (req, res) => {
     try {
@@ -446,11 +627,19 @@ app.get('/api/tarefas', async (req, res) => {
         const resultTasks = await pool.request().query(queryTasks);
         const tasks = resultTasks.recordset;
 
-        // Fetch all subtasks and associate them
         const querySubtasks = `
-            SELECT s.*, c.nome as colaborador_nome 
+            SELECT s.*, 
+                   COALESCE(c.nome, ct.nome) as colaborador_nome,
+                   ct.nome as colaborador_terceirizado_nome,
+                   CASE 
+                       WHEN s.colaborador_id IS NOT NULL THEN 'Prodesp'
+                       WHEN s.colaborador_terceirizado_id IS NOT NULL THEN ep.nome
+                       ELSE NULL
+                   END as colaborador_empresa
             FROM SubTarefas s 
             LEFT JOIN Colaboradores c ON s.colaborador_id = c.id
+            LEFT JOIN ColaboradoresTerceirizados ct ON s.colaborador_terceirizado_id = ct.id
+            LEFT JOIN EmpresasParceiras ep ON ct.empresa_id = ep.id
         `;
         const resultSubtasks = await pool.request().query(querySubtasks);
         const subtasks = resultSubtasks.recordset;
@@ -556,6 +745,13 @@ app.put('/api/tarefas/:id', async (req, res) => {
 app.delete('/api/tarefas/:id', async (req, res) => {
     const { id } = req.params;
     try {
+        const checkApont = await pool.request()
+            .input('tarefa_id', sql.Int, id)
+            .query('SELECT COUNT(*) as count FROM Apontamentos WHERE tarefa_id = @tarefa_id');
+        if (checkApont.recordset[0].count > 0) {
+            return res.status(400).json({ error: 'Não é possível excluir esta tarefa pois ela já possui apontamentos de horas registrados.' });
+        }
+
         await pool.request()
             .input('id', sql.Int, id)
             .query('DELETE FROM Tarefas WHERE id = @id');
@@ -571,7 +767,21 @@ app.get('/api/subtarefas/:tarefa_id', async (req, res) => {
     try {
         const result = await pool.request()
             .input('tarefa_id', sql.Int, tarefa_id)
-            .query('SELECT s.*, c.nome as colaborador_nome FROM SubTarefas s LEFT JOIN Colaboradores c ON s.colaborador_id = c.id WHERE s.tarefa_id = @tarefa_id');
+            .query(`
+                SELECT s.*, 
+                       COALESCE(c.nome, ct.nome) as colaborador_nome,
+                       ct.nome as colaborador_terceirizado_nome,
+                       CASE 
+                           WHEN s.colaborador_id IS NOT NULL THEN 'Prodesp'
+                           WHEN s.colaborador_terceirizado_id IS NOT NULL THEN ep.nome
+                           ELSE NULL
+                       END as colaborador_empresa
+                FROM SubTarefas s 
+                LEFT JOIN Colaboradores c ON s.colaborador_id = c.id 
+                LEFT JOIN ColaboradoresTerceirizados ct ON s.colaborador_terceirizado_id = ct.id
+                LEFT JOIN EmpresasParceiras ep ON ct.empresa_id = ep.id
+                WHERE s.tarefa_id = @tarefa_id
+            `);
         res.json(result.recordset);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -579,17 +789,18 @@ app.get('/api/subtarefas/:tarefa_id', async (req, res) => {
 });
 
 app.post('/api/subtarefas', async (req, res) => {
-    const { tarefa_id, titulo, concluida, colaborador_id } = req.body;
+    const { tarefa_id, titulo, concluida, colaborador_id, colaborador_terceirizado_id } = req.body;
     try {
         const result = await pool.request()
             .input('tarefa_id', sql.Int, tarefa_id)
             .input('titulo', sql.NVarChar, titulo)
             .input('concluida', sql.Bit, concluida ? 1 : 0)
             .input('colaborador_id', sql.Int, colaborador_id || null)
+            .input('colaborador_terceirizado_id', sql.Int, colaborador_terceirizado_id || null)
             .query(`
-                INSERT INTO SubTarefas (tarefa_id, titulo, concluida, colaborador_id)
+                INSERT INTO SubTarefas (tarefa_id, titulo, concluida, colaborador_id, colaborador_terceirizado_id)
                 OUTPUT INSERTED.*
-                VALUES (@tarefa_id, @titulo, @concluida, @colaborador_id)
+                VALUES (@tarefa_id, @titulo, @concluida, @colaborador_id, @colaborador_terceirizado_id)
             `);
         res.status(201).json(result.recordset[0]);
     } catch (err) {
@@ -618,16 +829,17 @@ app.put('/api/subtarefas/:id', async (req, res) => {
 
 app.put('/api/subtarefas/detalhes/:id', async (req, res) => {
     const { id } = req.params;
-    const { titulo, concluida, colaborador_id } = req.body;
+    const { titulo, concluida, colaborador_id, colaborador_terceirizado_id } = req.body;
     try {
         const result = await pool.request()
             .input('id', sql.Int, id)
             .input('titulo', sql.NVarChar, titulo)
             .input('concluida', sql.Bit, concluida ? 1 : 0)
             .input('colaborador_id', sql.Int, colaborador_id || null)
+            .input('colaborador_terceirizado_id', sql.Int, colaborador_terceirizado_id || null)
             .query(`
                 UPDATE SubTarefas
-                SET titulo = @titulo, concluida = @concluida, colaborador_id = @colaborador_id
+                SET titulo = @titulo, concluida = @concluida, colaborador_id = @colaborador_id, colaborador_terceirizado_id = @colaborador_terceirizado_id
                 OUTPUT INSERTED.*
                 WHERE id = @id
             `);
@@ -640,6 +852,13 @@ app.put('/api/subtarefas/detalhes/:id', async (req, res) => {
 app.delete('/api/subtarefas/:id', async (req, res) => {
     const { id } = req.params;
     try {
+        const checkApont = await pool.request()
+            .input('subtarefa_id', sql.Int, id)
+            .query('SELECT COUNT(*) as count FROM Apontamentos WHERE subtarefa_id = @subtarefa_id');
+        if (checkApont.recordset[0].count > 0) {
+            return res.status(400).json({ error: 'Não é possível excluir esta sub-tarefa pois ela já possui apontamentos de horas registrados.' });
+        }
+
         await pool.request()
             .input('id', sql.Int, id)
             .query('DELETE FROM SubTarefas WHERE id = @id');
@@ -762,10 +981,44 @@ app.post('/api/meses-fechamento', async (req, res) => {
 app.delete('/api/meses-fechamento/:id', async (req, res) => {
     const { id } = req.params;
     try {
+        const checkActive = await pool.request()
+            .input('id', sql.Int, id)
+            .query('SELECT ativo FROM MesesFechamento WHERE id = @id');
+        
+        const isActive = checkActive.recordset.length > 0 && checkActive.recordset[0].ativo;
+
         await pool.request()
             .input('id', sql.Int, id)
             .query('DELETE FROM MesesFechamento WHERE id = @id');
+
+        if (isActive) {
+            await pool.request().query(`
+                DECLARE @recent_id INT = (SELECT TOP 1 id FROM MesesFechamento ORDER BY data_inicio DESC);
+                IF @recent_id IS NOT NULL
+                BEGIN
+                    UPDATE MesesFechamento SET ativo = 1 WHERE id = @recent_id;
+                END
+            `);
+        }
+
         res.json({ success: true, message: 'Closing period deleted successfully.' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/meses-fechamento/:id/ativar', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const query = `
+            UPDATE MesesFechamento SET ativo = 0;
+            UPDATE MesesFechamento SET ativo = 1 WHERE id = @id;
+        `;
+        await pool.request()
+            .input('id', sql.Int, id)
+            .query(query);
+            
+        res.json({ success: true, message: 'Período ativado com sucesso.' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -1177,11 +1430,107 @@ app.get('*', (req, res) => {
 async function startServer() {
     try {
         await connectDB();
+        
+        // Execute migrations/DDL checks for new tables
+        console.log('Verifying and applying database schemas...');
+        await pool.request().query(`
+            -- Create EmpresasParceiras table if not exists
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'EmpresasParceiras')
+            BEGIN
+                CREATE TABLE EmpresasParceiras (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    nome NVARCHAR(150) NOT NULL,
+                    cnpj NVARCHAR(18) NOT NULL UNIQUE
+                );
+            END
+
+            -- Create ColaboradoresTerceirizados table if not exists
+            IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ColaboradoresTerceirizados')
+            BEGIN
+                CREATE TABLE ColaboradoresTerceirizados (
+                    id INT IDENTITY(1,1) PRIMARY KEY,
+                    empresa_id INT NOT NULL FOREIGN KEY REFERENCES EmpresasParceiras(id) ON DELETE CASCADE,
+                    cpf NVARCHAR(14) NOT NULL,
+                    nome NVARCHAR(150) NOT NULL,
+                    email NVARCHAR(150) NOT NULL,
+                    cargo NVARCHAR(100) NOT NULL
+                );
+            END
+
+            -- Add colaborador_terceirizado_id column to SubTarefas if not exists
+            IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('SubTarefas') AND name = 'colaborador_terceirizado_id')
+            BEGIN
+                ALTER TABLE SubTarefas ADD colaborador_terceirizado_id INT NULL 
+                CONSTRAINT FK_SubTarefas_ColaboradoresTerceirizados FOREIGN KEY REFERENCES ColaboradoresTerceirizados(id) ON DELETE SET NULL;
+            END
+
+            -- Add ativo column to MesesFechamento if not exists
+            IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('MesesFechamento') AND name = 'ativo')
+            BEGIN
+                ALTER TABLE MesesFechamento ADD ativo BIT NOT NULL DEFAULT 0;
+            END
+
+            -- Set the most recent period as active if none is active
+            EXEC('
+                IF NOT EXISTS (SELECT * FROM MesesFechamento WHERE ativo = 1)
+                BEGIN
+                    DECLARE @recent_id INT = (SELECT TOP 1 id FROM MesesFechamento ORDER BY data_inicio DESC);
+                    IF @recent_id IS NOT NULL
+                    BEGIN
+                        UPDATE MesesFechamento SET ativo = 1 WHERE id = @recent_id;
+                    END
+                END
+            ');
+
+            -- Create the new functionality if it doesn't exist
+            IF NOT EXISTS (SELECT * FROM Funcionalidades WHERE chave = 'empresas')
+            BEGIN
+                INSERT INTO Funcionalidades (nome, chave) VALUES (N'Empresas Parceiras', N'empresas');
+                
+                -- Also link it to the Administrador profile if it exists
+                DECLARE @admin_id INT = (SELECT id FROM Perfis WHERE nome = N'Administrador');
+                DECLARE @func_id INT = (SELECT id FROM Funcionalidades WHERE chave = N'empresas');
+                IF @admin_id IS NOT NULL AND @func_id IS NOT NULL
+                BEGIN
+                    INSERT INTO PerfilFuncionalidades (perfil_id, funcionalidade_id) VALUES (@admin_id, @func_id);
+                END
+            END
+
+            -- Seed default partner companies if empty
+            IF NOT EXISTS (SELECT * FROM EmpresasParceiras)
+            BEGIN
+                INSERT INTO EmpresasParceiras (nome, cnpj) VALUES 
+                (N'Tech Solutions Ltda', N'12.345.678/0001-90'),
+                (N'Global Outsourcing S.A.', N'98.765.432/0001-10');
+            END
+
+            -- Seed default outsourced collaborators if empty
+            IF NOT EXISTS (SELECT * FROM ColaboradoresTerceirizados)
+            BEGIN
+                DECLARE @tech_id INT = (SELECT id FROM EmpresasParceiras WHERE nome = N'Tech Solutions Ltda');
+                DECLARE @global_id INT = (SELECT id FROM EmpresasParceiras WHERE nome = N'Global Outsourcing S.A.');
+
+                IF @tech_id IS NOT NULL
+                BEGIN
+                    INSERT INTO ColaboradoresTerceirizados (empresa_id, cpf, nome, email, cargo) VALUES
+                    (@tech_id, N'111.222.333-44', N'Lucas Oliveira', N'lucas.oliveira@techsolutions.com', N'Desenvolvedor Frontend Terceirizado'),
+                    (@tech_id, N'222.333.444-55', N'Mariana Santos', N'mariana.santos@techsolutions.com', N'QA Engineer Terceirizado');
+                END
+
+                IF @global_id IS NOT NULL
+                BEGIN
+                    INSERT INTO ColaboradoresTerceirizados (empresa_id, cpf, nome, email, cargo) VALUES
+                    (@global_id, N'333.444.555-66', N'Rodrigo Lima', N'rodrigo.lima@globalout.com', N'Analista de Suporte Terceirizado');
+                END
+            END
+        `);
+        console.log('Database schemas verified/created successfully.');
+
         app.listen(port, () => {
             console.log(`Task Management server is running on http://localhost:${port}`);
         });
     } catch (err) {
-        console.error('Fatal: Could not start server because database connection failed.', err);
+        console.error('Fatal: Could not start server because database connection failed or schema verification failed.', err);
         process.exit(1);
     }
 }

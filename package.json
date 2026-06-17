@@ -1,6 +1,6 @@
 {
   "name": "controle-tarefas",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Web app for local task management and monthly closings with SQL Server",
   "main": "server.js",
   "scripts": {
