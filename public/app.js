@@ -1486,16 +1486,38 @@ function updateApontamentoCoordenadoriaDropdown(updateColabs = true, isFirstLoad
             coordSelect.value = 'all';
         }
     } else if (userProfiles.includes('Coordenador')) {
-        const userCoord = state.coordenadorias.find(c => c.id == userCoordenadoriaId);
-        if (userCoord) {
-            coordHtml = `<option value="${userCoord.id}">${userCoord.sigla} - ${userCoord.nome}</option>`;
-            availableCoords = [userCoord];
+        const coordIds = new Set();
+        availableCoords = [];
+        state.coordenadorias.forEach(c => {
+            if (c.coordenador_id == state.currentUser.id || c.id == userCoordenadoriaId) {
+                if (!coordIds.has(c.id)) {
+                    coordIds.add(c.id);
+                    availableCoords.push(c);
+                }
+            }
+        });
+
+        if (availableCoords.length > 0) {
+            if (availableCoords.length > 1) {
+                coordHtml = '<option value="all">Todas as Coordenadorias</option>';
+            }
+            availableCoords.forEach(c => {
+                coordHtml += `<option value="${c.id}">${c.sigla} - ${c.nome}</option>`;
+            });
+            coordSelect.disabled = false;
         } else {
             coordHtml = '<option value="" disabled selected>Coordenadoria não encontrada</option>';
+            coordSelect.disabled = true;
         }
         coordSelect.innerHTML = coordHtml;
-        coordSelect.disabled = true;
-        coordSelect.value = userCoordenadoriaId || '';
+        
+        if (isFirstLoad) {
+            coordSelect.value = userCoordenadoriaId || 'all';
+        } else if (currentCoordId && [...coordSelect.options].some(o => o.value == currentCoordId)) {
+            coordSelect.value = currentCoordId;
+        } else {
+            coordSelect.value = availableCoords.length > 1 ? 'all' : (availableCoords[0] ? availableCoords[0].id : '');
+        }
     }
 
     // Rule: "caso tenha somente um item na lista, já trazer selecionado"
@@ -1525,8 +1547,25 @@ function updateApontamentoColaboradorDropdown(isFirstLoad = false) {
         filteredColabs = filteredColabs.filter(c => c.gerencia_id == selectedGerId);
     }
 
-    if (selectedCoordId && selectedCoordId !== 'all') {
-        filteredColabs = filteredColabs.filter(c => c.coordenadoria_id == selectedCoordId);
+    const currentColab = state.currentUser ? state.colaboradores.find(c => c.id == state.currentUser.id) : null;
+    const perfilIds = currentColab ? (currentColab.perfil_ids || []) : [];
+    const userProfiles = state.perfis.filter(p => perfilIds.includes(p.id)).map(p => p.nome);
+    const userCoordenadoriaId = currentColab ? currentColab.coordenadoria_id : null;
+
+    if (userProfiles.includes('Coordenador') && !userProfiles.includes('Administrador') && !userProfiles.includes('Gerência')) {
+        const coordIds = state.coordenadorias
+            .filter(c => c.coordenador_id == state.currentUser.id || c.id == userCoordenadoriaId)
+            .map(c => c.id);
+        
+        if (selectedCoordId && selectedCoordId !== 'all') {
+            filteredColabs = filteredColabs.filter(c => c.coordenadoria_id == selectedCoordId);
+        } else {
+            filteredColabs = filteredColabs.filter(c => coordIds.includes(c.coordenadoria_id));
+        }
+    } else {
+        if (selectedCoordId && selectedCoordId !== 'all') {
+            filteredColabs = filteredColabs.filter(c => c.coordenadoria_id == selectedCoordId);
+        }
     }
 
     filteredColabs.forEach(c => {
@@ -3474,6 +3513,7 @@ function renderApontamentosTab() {
         const selectedCoordId = elements.apontamentoCoordenadoriaFilter ? elements.apontamentoCoordenadoriaFilter.value : 'all';
         const selectedColabId = elements.apontamentoColaboradorFilter ? elements.apontamentoColaboradorFilter.value : 'all';
 
+        const userCoordenadoriaId = currentColab ? currentColab.coordenadoria_id : null;
         list = list.filter(a => {
             const colab = state.colaboradores.find(c => c.id == a.colaborador_id);
             if (!colab) return false;
@@ -3481,9 +3521,23 @@ function renderApontamentosTab() {
             if (selectedGerId && selectedGerId !== 'all' && colab.gerencia_id != selectedGerId) {
                 return false;
             }
-            if (selectedCoordId && selectedCoordId !== 'all' && colab.coordenadoria_id != selectedCoordId) {
-                return false;
+            
+            if (userProfiles.includes('Coordenador') && !userProfiles.includes('Administrador') && !userProfiles.includes('Gerência')) {
+                const coordIds = state.coordenadorias
+                    .filter(c => c.coordenador_id == state.currentUser.id || c.id == userCoordenadoriaId)
+                    .map(c => c.id);
+                
+                if (selectedCoordId && selectedCoordId !== 'all') {
+                    if (colab.coordenadoria_id != selectedCoordId) return false;
+                } else {
+                    if (!coordIds.includes(colab.coordenadoria_id)) return false;
+                }
+            } else {
+                if (selectedCoordId && selectedCoordId !== 'all' && colab.coordenadoria_id != selectedCoordId) {
+                    return false;
+                }
             }
+
             if (selectedColabId && selectedColabId !== 'all' && a.colaborador_id != selectedColabId) {
                 return false;
             }
