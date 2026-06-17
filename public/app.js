@@ -484,6 +484,11 @@ function setupEventListeners() {
         btnPrintColabs.addEventListener('click', generateAllCollaboratorsPDF);
     }
 
+    const btnPrintAllApontamentos = document.getElementById('btn-print-all-apontamentos');
+    if (btnPrintAllApontamentos) {
+        btnPrintAllApontamentos.addEventListener('click', generateAllApontamentosPDF);
+    }
+
     const reportGerenciaFilter = document.getElementById('report-gerencia-filter');
     if (reportGerenciaFilter) {
         reportGerenciaFilter.addEventListener('change', (e) => {
@@ -2606,6 +2611,307 @@ window.generateCollaboratorPDF = function(collaboratorId, customPeriodId = null)
     printWindow.document.close();
 }
 
+window.generateAllApontamentosPDF = function() {
+    const currentColab = state.currentUser ? state.colaboradores.find(c => c.id == state.currentUser.id) : null;
+    const perfilIds = currentColab ? (currentColab.perfil_ids || []) : [];
+    const userProfiles = state.perfis.filter(p => perfilIds.includes(p.id)).map(p => p.nome);
+    const isHigher = userProfiles.includes('Administrador') || userProfiles.includes('Gerência') || userProfiles.includes('Coordenador');
+
+    if (!isHigher) return;
+
+    let list = state.apontamentos;
+    const userGerenciaId = currentColab ? currentColab.gerencia_id : null;
+    const userCoordenadoriaId = currentColab ? currentColab.coordenadoria_id : null;
+
+    const selectedGerId = elements.apontamentoGerenciaFilter ? elements.apontamentoGerenciaFilter.value : 'all';
+    const selectedCoordId = elements.apontamentoCoordenadoriaFilter ? elements.apontamentoCoordenadoriaFilter.value : 'all';
+    const selectedColabId = elements.apontamentoColaboradorFilter ? elements.apontamentoColaboradorFilter.value : 'all';
+
+    // 1. Filter by roles/scope
+    if (userProfiles.includes('Administrador')) {
+        list = list.filter(a => {
+            const colab = state.colaboradores.find(c => c.id == a.colaborador_id);
+            if (!colab) return false;
+            if (selectedGerId && selectedGerId !== 'all' && colab.gerencia_id != selectedGerId) return false;
+            if (selectedCoordId && selectedCoordId !== 'all' && colab.coordenadoria_id != selectedCoordId) return false;
+            if (selectedColabId && selectedColabId !== 'all' && a.colaborador_id != selectedColabId) return false;
+            return true;
+        });
+    } else if (userProfiles.includes('Gerência')) {
+        list = list.filter(a => {
+            const colab = state.colaboradores.find(c => c.id == a.colaborador_id);
+            if (!colab) return false;
+            if (colab.gerencia_id != userGerenciaId) return false;
+            if (selectedCoordId && selectedCoordId !== 'all' && colab.coordenadoria_id != selectedCoordId) return false;
+            if (selectedColabId && selectedColabId !== 'all' && a.colaborador_id != selectedColabId) return false;
+            return true;
+        });
+    } else if (userProfiles.includes('Coordenador')) {
+        const coordIds = state.coordenadorias
+            .filter(c => c.coordenador_id == state.currentUser.id || c.id == userCoordenadoriaId)
+            .map(c => c.id);
+
+        list = list.filter(a => {
+            const colab = state.colaboradores.find(c => c.id == a.colaborador_id);
+            if (!colab) return false;
+            if (colab.gerencia_id != userGerenciaId) return false;
+            
+            if (selectedCoordId && selectedCoordId !== 'all') {
+                if (colab.coordenadoria_id != selectedCoordId) return false;
+            } else {
+                if (!coordIds.includes(colab.coordenadoria_id)) return false;
+            }
+
+            if (selectedColabId && selectedColabId !== 'all' && a.colaborador_id != selectedColabId) return false;
+            return true;
+        });
+    }
+
+    // 2. Filter by period
+    const periodFilter = elements.apontamentoPeriodFilter;
+    const periodId = periodFilter ? periodFilter.value : null;
+    const period = state.mesesFechamento.find(p => p.id == periodId);
+    if (period) {
+        const pStart = typeof period.data_inicio === 'object' ? period.data_inicio.toISOString().split('T')[0] : String(period.data_inicio).split('T')[0];
+        const pEnd = typeof period.data_fim === 'object' ? period.data_fim.toISOString().split('T')[0] : String(period.data_fim).split('T')[0];
+        
+        list = list.filter(a => {
+            const aDate = typeof a.data_apontamento === 'object' ? a.data_apontamento.toISOString().split('T')[0] : String(a.data_apontamento).split('T')[0];
+            return aDate >= pStart && aDate <= pEnd;
+        });
+    }
+
+    // 3. Filter by search value
+    const searchVal = elements.apontamentoSearch.value.toLowerCase();
+    if (searchVal) {
+        list = list.filter(a => 
+            (a.colaborador_nome && a.colaborador_nome.toLowerCase().includes(searchVal)) || 
+            (a.projeto_nome && a.projeto_nome.toLowerCase().includes(searchVal)) ||
+            (a.tarefa_titulo && a.tarefa_titulo.toLowerCase().includes(searchVal)) ||
+            (a.subtarefa_titulo && a.subtarefa_titulo.toLowerCase().includes(searchVal)) ||
+            (a.descricao && a.descricao.toLowerCase().includes(searchVal))
+        );
+    }
+
+    // 4. Group by collaborator
+    const colabTotals = {};
+    list.forEach(a => {
+        const id = a.colaborador_id;
+        const name = a.colaborador_nome || 'Sem Nome';
+        if (!colabTotals[id]) {
+            const colabObj = state.colaboradores.find(c => c.id == id);
+            const sector = colabObj ? (colabObj.coordenadoria_sigla || 'Sem Setor') : 'N/A';
+            colabTotals[id] = { id, name, sector, pointings: [] };
+        }
+        colabTotals[id].pointings.push(a);
+    });
+
+    const sortedColabs = Object.values(colabTotals).sort((a, b) => a.name.localeCompare(b.name));
+
+    if (sortedColabs.length === 0) {
+        alert('Nenhum colaborador com apontamentos encontrados para gerar o PDF.');
+        return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        alert('Por favor, permita pop-ups para gerar o PDF.');
+        return;
+    }
+
+    const startStr = period ? formatDate(period.data_inicio) : '';
+    const endStr = period ? formatDate(period.data_fim) : '';
+    const periodDesc = period ? period.descricao : '';
+
+    let htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Relatórios de Apontamentos - Consolidado</title>
+            <style>
+                body {
+                    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                    color: #333;
+                    margin: 40px;
+                    font-size: 13px;
+                    line-height: 1.4;
+                }
+                .collaborator-section {
+                    page-break-after: always;
+                }
+                .collaborator-section:last-child {
+                    page-break-after: avoid;
+                }
+                .header {
+                    border-bottom: 2px solid #6d28d9;
+                    padding-bottom: 15px;
+                    margin-bottom: 20px;
+                }
+                .header-title {
+                    font-size: 20px;
+                    font-weight: bold;
+                    color: #111;
+                    margin: 0 0 8px 0;
+                }
+                .meta-grid {
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 10px;
+                    margin-top: 10px;
+                }
+                .meta-item {
+                    font-size: 12.5px;
+                }
+                .meta-label {
+                    font-weight: bold;
+                    color: #555;
+                }
+                .meta-value {
+                    color: #111;
+                }
+                table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-top: 15px;
+                    margin-bottom: 25px;
+                }
+                th, td {
+                    border: 1px solid #ddd;
+                    padding: 8px 10px;
+                    text-align: left;
+                    font-size: 12px;
+                }
+                th {
+                    background-color: #f3f4f6;
+                    font-weight: bold;
+                    color: #374151;
+                }
+                tr:nth-child(even) {
+                    background-color: #fafafa;
+                }
+                .footer {
+                    margin-top: 30px;
+                    border-top: 1px solid #ddd;
+                    padding-top: 15px;
+                    font-size: 11px;
+                    color: #666;
+                    display: flex;
+                    justify-content: space-between;
+                }
+                @media print {
+                    body {
+                        margin: 20px;
+                    }
+                }
+            </style>
+        </head>
+        <body>
+    `;
+
+    sortedColabs.forEach(item => {
+        item.pointings.sort((a, b) => {
+            const dateA = typeof a.data_apontamento === 'object' ? a.data_apontamento.toISOString() : String(a.data_apontamento);
+            const dateB = typeof b.data_apontamento === 'object' ? b.data_apontamento.toISOString() : String(b.data_apontamento);
+            return dateA.localeCompare(dateB);
+        });
+
+        const totalHours = item.pointings.reduce((sum, a) => sum + (a.horas ? parseFloat(a.horas) : 0), 0);
+
+        let rowsHtml = '';
+        item.pointings.forEach(a => {
+            const dateStr = formatDate(a.data_apontamento);
+            const hoursStr = a.horas !== null && a.horas !== undefined ? `${a.horas}h` : '-';
+            
+            const task = state.tarefas.find(t => t.id == a.tarefa_id);
+            const taskStatus = task ? task.status : 'N/A';
+            const requesterName = task ? (task.solicitante_nome || 'N/A') : 'N/A';
+
+            let statusColor = '#333';
+            if (taskStatus === 'Concluída') statusColor = '#10b981';
+            else if (taskStatus === 'Em Progresso') statusColor = '#3b82f6';
+            else if (taskStatus === 'A Fazer') statusColor = '#6b7280';
+
+            rowsHtml += `
+                <tr>
+                    <td style="white-space: nowrap;">${dateStr}</td>
+                    <td>${a.projeto_nome || 'N/A'}</td>
+                    <td>${a.tarefa_titulo || 'N/A'}</td>
+                    <td style="color: ${statusColor}; font-weight: 600; white-space: nowrap;">${taskStatus}</td>
+                    <td>${requesterName}</td>
+                    <td>${a.subtarefa_titulo || 'Atividade Geral'}</td>
+                    <td style="text-align: right; font-weight: bold;">${hoursStr}</td>
+                    <td>${a.descricao || ''}</td>
+                </tr>
+            `;
+        });
+
+        htmlContent += `
+            <div class="collaborator-section">
+                <div class="header">
+                    <div class="header-title">Relatório Individual de Apontamentos</div>
+                    <div class="meta-grid">
+                        <div class="meta-item">
+                            <span class="meta-label">Colaborador:</span>
+                            <span class="meta-value" style="font-weight: bold;">${item.name}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Período:</span>
+                            <span class="meta-value">${periodDesc} (${startStr} a ${endStr})</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Setor:</span>
+                            <span class="meta-value">${item.sector}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span class="meta-label">Total de Horas:</span>
+                            <span class="meta-value" style="font-weight: bold; color: #6d28d9;">${totalHours.toFixed(1)}h</span>
+                        </div>
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 80px;">Data</th>
+                            <th style="width: 110px;">Projeto</th>
+                            <th style="width: 120px;">Tarefa</th>
+                            <th style="width: 80px;">Status</th>
+                            <th style="width: 90px;">Solicitante</th>
+                            <th style="width: 90px;">Sub-tarefa</th>
+                            <th style="width: 45px; text-align: right;">Horas</th>
+                            <th>Descrição da Atividade</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+
+                <div class="footer">
+                    <span>Gerado automaticamente pelo sistema de Gestão de Tarefas</span>
+                    <span>Data da geração: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</span>
+                </div>
+            </div>
+        `;
+    });
+
+    htmlContent += `
+            <script>
+                window.onload = function() {
+                    setTimeout(function() {
+                        window.print();
+                    }, 400);
+                }
+            </script>
+        </body>
+        </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+};
+
 // --- FORM HANDLING: SUBMITS ---
 
 async function handleProjectSubmit(e) {
@@ -3506,6 +3812,11 @@ function renderApontamentosTab() {
     const isApontador = userProfiles.includes('Apontador');
     const isHigher = userProfiles.includes('Administrador') || userProfiles.includes('Gerência') || userProfiles.includes('Coordenador');
     
+    const btnPrintAll = document.getElementById('btn-print-all-apontamentos');
+    if (btnPrintAll) {
+        btnPrintAll.style.display = isHigher ? 'inline-flex' : 'none';
+    }
+
     if (isApontador && !isHigher) {
         list = list.filter(a => a.colaborador_id == state.currentUser.id);
     } else if (isHigher) {
@@ -3569,7 +3880,21 @@ function renderApontamentosTab() {
         (a.descricao && a.descricao.toLowerCase().includes(searchVal))
     );
 
-    if (isHigher) {
+    const selectedColabId = elements.apontamentoColaboradorFilter ? elements.apontamentoColaboradorFilter.value : 'all';
+
+    if (selectedColabId === 'all') {
+        filteredApontamentos.sort((a, b) => {
+            const nameA = (a.colaborador_nome || '').toLowerCase();
+            const nameB = (b.colaborador_nome || '').toLowerCase();
+            const nameCompare = nameA.localeCompare(nameB);
+            if (nameCompare !== 0) {
+                return nameCompare;
+            }
+            const dateA = typeof a.data_apontamento === 'object' ? a.data_apontamento.toISOString() : String(a.data_apontamento);
+            const dateB = typeof b.data_apontamento === 'object' ? b.data_apontamento.toISOString() : String(b.data_apontamento);
+            return dateA.localeCompare(dateB);
+        });
+    } else if (isHigher) {
         filteredApontamentos.sort((a, b) => {
             const aIsOwn = a.colaborador_id == state.currentUser.id ? 1 : 0;
             const bIsOwn = b.colaborador_id == state.currentUser.id ? 1 : 0;

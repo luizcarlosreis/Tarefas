@@ -640,8 +640,11 @@
 
                     <!-- Painel de Totalização por Colaborador -->
                     <div class="panel glass" style="margin-top: 30px;">
-                        <div class="panel-header">
+                        <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
                             <h3>Total de Horas por Colaborador</h3>
+                            <button class="btn btn-secondary btn-sm" id="btn-print-all-apontamentos" style="display: none; padding: 6px 12px; font-size: 12.5px; height: auto;">
+                                <i class="fa-solid fa-print"></i> Imprimir Todos (PDF)
+                            </button>
                         </div>
                         <div class="table-responsive">
                             <table class="custom-table">
